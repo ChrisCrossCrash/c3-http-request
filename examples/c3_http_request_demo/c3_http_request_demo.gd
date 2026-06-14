@@ -7,6 +7,7 @@ func _ready() -> void:
 	await demo_not_found()
 	await demo_timeout()
 	await demo_body_size_limit()
+	await demo_redirect_limit()
 	await demo_download_file()
 	await demo_progress()
 	await demo_status()
@@ -91,6 +92,25 @@ func demo_body_size_limit() -> void:
 	)
 	print("ok:    ", res.ok)
 	print("error: ", str(res.error))
+
+
+func demo_redirect_limit() -> void:
+	print("\n--- Redirect limit ---")
+	# httpbin's /redirect/5 issues a 5-hop chain of 302s. With a budget of 2 we
+	# stop partway and get the next 302 back: ok is false, kind is HTTP, status
+	# is 302, and the message explains the budget was spent.
+	var opts := C3HTTPRequest.Options.new()
+	opts.max_redirects = 2
+	var res := await C3HTTPRequest.request(
+		"https://httpbin.org/redirect/5",
+		PackedStringArray(),
+		C3HTTPRequest.Method.GET,
+		"",
+		opts
+	)
+	print("ok:     ", res.ok)
+	print("status: ", res.status)
+	print("error:  ", str(res.error))
 
 
 func demo_download_file() -> void:

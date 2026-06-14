@@ -499,7 +499,19 @@ class _Impl:
 			var e := C3HTTPRequest.RequestError.new()
 			e.kind = C3HTTPRequest.RequestError.Kind.HTTP
 			e.status = status
-			e.message = "Request failed with status %d." % status
+			# A 3xx carrying a Location that we stopped following only because the
+			# redirect budget is spent. Say so, otherwise the bare status reads
+			# like an unexpected failure. (redirects_left is never negative, so
+			# == 0 is the exhausted/disabled case.)
+			var is_redirect := status >= 300 and status < 400
+			var has_location := not _header_value(resp_headers, "Location").is_empty()
+			if is_redirect and has_location and redirects_left == 0:
+				e.message = (
+					"Redirect limit (%d) reached at status %d; not following further."
+					% [options.max_redirects, status]
+				)
+			else:
+				e.message = "Request failed with status %d." % status
 			res.error = e
 		return res
 
