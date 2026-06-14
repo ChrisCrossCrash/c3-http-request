@@ -39,11 +39,11 @@ The addon is a single script: [c3_http_request/c3_http_request.gd](c3_http_reque
 
 **Inner classes:**
 - `Method` enum — `GET`, `HEAD`, `POST`, `PUT`, `DELETE`, `OPTIONS`, `PATCH`
-- `Options` — `timeout`, `body_size_limit`, `download_chunk_size`, `accept_gzip`, `max_redirects`, `download_file`, `tls_options`, `cancellation_token`
+- `Options` — `timeout`, `body_size_limit`, `download_chunk_size`, `accept_gzip`, `max_redirects`, `download_file`, `tls_options`, `cancellation_token`, `on_event` (SSE streaming sink)
 - `Response` — `ok: bool`, `error: RequestError`, `status: int`, `headers: PackedStringArray`, `body: String`
 - `RequestError` — `Kind` enum (`TRANSPORT`, `HTTP`, `CLIENT`, `CANCELLED`, `TIMEOUT`), `kind`, `message`, `status`, factory methods, `_to_string()`
 - `CancellationToken` — `cancel()`, `is_cancelled()`
-- `_Impl` — contains `execute()` with the `HTTPClient` polling loop, plus `_parse_url()`, `_timed_out()`, `_cancelled()`, `_header_value()`, `_fail()` helpers
+- `_Impl` — contains `execute()` with the `HTTPClient` polling loop, plus `_parse_url()`, `_timed_out()`, `_cancelled()`, `_header_value()`, `_fail()` helpers and the SSE parser (`_drain_sse_buffer()`, `_find_sse_boundary()`, `_emit_sse_event()`)
 
 **Transport** is Godot's `HTTPClient` (a `RefCounted`), created per call inside `_Impl.execute()`. The polling loop yields to `SceneTree.process_frame` via `Engine.get_main_loop()` — no scene tree membership required from the caller.
 

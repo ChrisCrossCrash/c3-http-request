@@ -88,6 +88,20 @@ class Options:
 	## Token for cancelling this request from another coroutine or signal
 	## handler. [code]null[/code] means no cancellation support.
 	var cancellation_token: CancellationToken = null
+	## Optional [Callable] invoked once per Server-Sent Event as the response
+	## streams in, as
+	## [code]on_event.call(data: String, event_type: String)[/code]. When set,
+	## a 2xx response body is parsed as an SSE stream rather than collected:
+	## [member Response.body] stays empty and [method C3HTTPRequest.request]
+	## resolves only when the stream closes (use [member cancellation_token] to
+	## stop it early). While streaming, [member accept_gzip] and
+	## [member download_file] are ignored, and [member timeout] becomes an idle
+	## timeout (maximum seconds between events) rather than a total deadline. A
+	## non-2xx response is collected normally, so [member Response.ok],
+	## [member Response.error], and the error body still work as usual. Both LF
+	## ([code]\n\n[/code]) and CRLF ([code]\r\n\r\n[/code]) event delimiters are
+	## supported.
+	var on_event: Callable = Callable()
 
 
 ## The response returned by [method C3HTTPRequest.request].
@@ -215,6 +229,8 @@ class _Impl:
 		var redirects_left := (
 			options.max_redirects if _redirects_left < 0 else _redirects_left
 		)
+		# A valid on_event sink switches a 2xx body to incremental SSE parsing.
+		var streaming := options.on_event.is_valid()
 
 		var parsed := _parse_url(url)
 		if parsed.is_empty():
@@ -223,7 +239,7 @@ class _Impl:
 			))
 
 		var file: FileAccess = null
-		if not options.download_file.is_empty():
+		if not options.download_file.is_empty() and not streaming:
 			file = FileAccess.open(options.download_file, FileAccess.WRITE)
 			if file == null:
 				return _fail(C3HTTPRequest.RequestError.client_error(
@@ -231,7 +247,7 @@ class _Impl:
 				))
 
 		var all_headers := PackedStringArray()
-		if options.accept_gzip and options.download_file.is_empty():
+		if options.accept_gzip and options.download_file.is_empty() and not streaming:
 			all_headers.append("Accept-Encoding: gzip, deflate")
 		all_headers.append_array(custom_headers)
 
@@ -312,13 +328,21 @@ class _Impl:
 		var status := client.get_response_code()
 		var resp_headers: PackedStringArray = client.get_response_headers()
 
+		# A 2xx body with a sink set is parsed as an SSE stream; everything else
+		# (non-2xx error bodies, redirect bodies) is collected normally.
+		var sse_mode := streaming and status >= 200 and status < 300
 		var body_bytes := PackedByteArray()
+		var sse_buffer := PackedByteArray()
+		var last_recv_ms := start_ms
 		while client.get_status() == HTTPClient.STATUS_BODY:
-			if _timed_out(start_ms, options.timeout):
+			# While streaming, timeout is idle time since the last bytes, not total
+			# stream duration — a healthy long-lived stream must not be cut off.
+			if _timed_out(last_recv_ms if sse_mode else start_ms, options.timeout):
 				if file != null:
 					file.close()
 				return _fail(C3HTTPRequest.RequestError.timed_out(
-					"Timed out while reading body."
+					"Stream idle for too long." if sse_mode
+					else "Timed out while reading body."
 				))
 			if _cancelled(options):
 				if file != null:
@@ -330,6 +354,21 @@ class _Impl:
 			var chunk: PackedByteArray = client.read_response_body_chunk()
 			if chunk.is_empty():
 				await tree.process_frame
+				continue
+			last_recv_ms = Time.get_ticks_msec()
+			if sse_mode:
+				# Accumulate raw bytes and slice on the ASCII event delimiter so a
+				# multi-byte UTF-8 character split across reads is never mangled.
+				if (
+					options.body_size_limit >= 0
+					and sse_buffer.size() + chunk.size() > options.body_size_limit
+				):
+					return _fail(C3HTTPRequest.RequestError.body_size_limit_exceeded(
+						"SSE event exceeded limit of %d bytes."
+						% options.body_size_limit
+					))
+				sse_buffer.append_array(chunk)
+				sse_buffer = _drain_sse_buffer(sse_buffer, options.on_event)
 				continue
 			if (
 				options.body_size_limit >= 0
@@ -348,6 +387,13 @@ class _Impl:
 
 		if file != null:
 			file.close()
+
+		# A server may end the final event without a trailing blank line; flush
+		# what remains. Every byte has arrived, so decode the tail in one pass.
+		if sse_mode:
+			var tail := sse_buffer.get_string_from_utf8()
+			if not tail.strip_edges().is_empty():
+				_emit_sse_event(tail, options.on_event)
 
 		if options.accept_gzip and file == null and not body_bytes.is_empty():
 			var encoding := _header_value(resp_headers, "Content-Encoding").to_lower()
@@ -510,6 +556,64 @@ class _Impl:
 		):
 			return ""
 		return request_data
+
+	# Carves every complete event out of [param buffer], dispatching each to
+	# [param on_event], and returns the trailing partial bytes (an incomplete
+	# event, possibly mid-character) to keep for the next read.
+	func _drain_sse_buffer(
+		buffer: PackedByteArray, on_event: Callable
+	) -> PackedByteArray:
+		var bound := _find_sse_boundary(buffer)
+		while bound.x != -1:
+			_emit_sse_event(buffer.slice(0, bound.x).get_string_from_utf8(), on_event)
+			buffer = buffer.slice(bound.y)
+			bound = _find_sse_boundary(buffer)
+		return buffer
+
+	# Locates the first SSE event boundary (a blank line) in [param buffer],
+	# handling both LF (\n\n) and CRLF (\r\n\r\n) terminators. Returns a Vector2i
+	# of (content_end, next_start) byte offsets, or (-1, -1) if no complete event
+	# has arrived. The delimiter is pure ASCII, so it is found at the byte level
+	# without decoding — a multi-byte UTF-8 character can never straddle it.
+	func _find_sse_boundary(buffer: PackedByteArray) -> Vector2i:
+		var size := buffer.size()
+		var i := 0
+		while i < size:
+			if buffer[i] == 0x0A:
+				var j := i + 1
+				if j < size and buffer[j] == 0x0D:
+					j += 1
+				if j < size and buffer[j] == 0x0A:
+					return Vector2i(i, j + 1)
+			i += 1
+		return Vector2i(-1, -1)
+
+	# Parses one raw SSE event block and, if it carries data, invokes
+	# [param on_event] with (data, event_type). Multiple data: lines are joined
+	# with newlines; event_type defaults to "message" per the SSE spec. Comment
+	# lines (":") and events with no data: lines (bare keep-alives, id-only
+	# blocks) are dropped. The id: and retry: fields are ignored — this client
+	# does not reconnect.
+	func _emit_sse_event(raw_event: String, on_event: Callable) -> void:
+		var data_lines := PackedStringArray()
+		var event_type := "message"
+		for line: String in raw_event.split("\n"):
+			line = line.trim_suffix("\r")
+			if line.begins_with(":"):
+				continue
+			if line.begins_with("data:"):
+				var value := line.substr(5)
+				if value.begins_with(" "):
+					value = value.substr(1)
+				data_lines.append(value)
+			elif line.begins_with("event:"):
+				var value := line.substr(6)
+				if value.begins_with(" "):
+					value = value.substr(1)
+				event_type = value
+		if data_lines.is_empty():
+			return
+		on_event.call("\n".join(data_lines), event_type)
 
 	func _fail(error: C3HTTPRequest.RequestError) -> C3HTTPRequest.Response:
 		var res := C3HTTPRequest.Response.new()

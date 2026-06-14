@@ -309,6 +309,9 @@ class TestOptions extends GutTest:
 	func test_default_cancellation_token() -> void:
 		assert_null(C3HTTPRequest.Options.new().cancellation_token)
 
+	func test_default_on_event_is_invalid() -> void:
+		assert_false(C3HTTPRequest.Options.new().on_event.is_valid())
+
 
 ## Tests for [C3HTTPRequest.CancellationToken] and cancellation behavior.
 class TestCancellationToken extends GutTest:
@@ -354,6 +357,178 @@ class TestCancellationToken extends GutTest:
 			opts
 		)
 		assert_string_contains(str(res.error), "[cancelled]")
+
+
+## Unit tests for the internal SSE event parser.
+class TestSSEParsing extends GutTest:
+	# 😀 U+1F600 — 4 bytes: F0 9F 98 80.
+	const _EMOJI := "😀"
+	# — U+2014 em-dash — 3 bytes: E2 80 94.
+	const _EM_DASH := "—"
+
+	var impl: C3HTTPRequest._Impl
+	var events: Array = []
+
+	func before_each() -> void:
+		impl = C3HTTPRequest._Impl.new()
+		events = []
+
+	# Records each dispatched event as [data, event_type].
+	func _sink() -> Callable:
+		return func(data: String, event_type: String) -> void:
+			events.append([data, event_type])
+
+	# Feeds [param first] then [param second] as two separate socket reads,
+	# draining after each — mirroring the body loop accumulating raw bytes across
+	# frames. A character split across the two reads must survive reassembly.
+	func _feed_two_reads(first: PackedByteArray, second: PackedByteArray) -> void:
+		var rest := impl._drain_sse_buffer(first, _sink())
+		rest.append_array(second)
+		impl._drain_sse_buffer(rest, _sink())
+
+	# _emit_sse_event
+	func test_emit_basic_event_defaults_to_message() -> void:
+		impl._emit_sse_event("data: hello", _sink())
+		assert_eq(events, [["hello", "message"]])
+
+	func test_emit_uses_event_type() -> void:
+		impl._emit_sse_event("event: ping\ndata: hello", _sink())
+		assert_eq(events, [["hello", "ping"]])
+
+	func test_emit_joins_multiple_data_lines() -> void:
+		impl._emit_sse_event("data: a\ndata: b", _sink())
+		assert_eq(events, [["a\nb", "message"]])
+
+	func test_emit_strips_single_leading_space() -> void:
+		impl._emit_sse_event("data:  two-spaces", _sink())
+		assert_eq(events[0][0], " two-spaces")
+
+	func test_emit_data_without_space() -> void:
+		impl._emit_sse_event("data:nospace", _sink())
+		assert_eq(events[0][0], "nospace")
+
+	func test_emit_ignores_comment_lines() -> void:
+		impl._emit_sse_event(": keep-alive\ndata: hi", _sink())
+		assert_eq(events, [["hi", "message"]])
+
+	func test_emit_drops_event_with_no_data() -> void:
+		impl._emit_sse_event("event: ping\nid: 42", _sink())
+		assert_eq(events, [])
+
+	func test_emit_strips_trailing_cr_from_crlf_lines() -> void:
+		impl._emit_sse_event("event: ping\r\ndata: hi\r", _sink())
+		assert_eq(events, [["hi", "ping"]])
+
+	func test_emit_empty_string_emits_nothing() -> void:
+		impl._emit_sse_event("", _sink())
+		assert_eq(events, [])
+
+	func test_emit_only_comments_emits_nothing() -> void:
+		impl._emit_sse_event(": ping\n: pong", _sink())
+		assert_eq(events, [])
+
+	func test_emit_event_field_alone_emits_nothing() -> void:
+		impl._emit_sse_event("event: update", _sink())
+		assert_eq(events, [])
+
+	func test_emit_id_field_alone_emits_nothing() -> void:
+		impl._emit_sse_event("id: 42", _sink())
+		assert_eq(events, [])
+
+	func test_emit_retry_field_alone_emits_nothing() -> void:
+		impl._emit_sse_event("retry: 3000", _sink())
+		assert_eq(events, [])
+
+	func test_emit_id_with_data_emits_only_data() -> void:
+		impl._emit_sse_event("id: 42\ndata: hello", _sink())
+		assert_eq(events, [["hello", "message"]])
+
+	func test_emit_retry_with_data_emits_only_data() -> void:
+		impl._emit_sse_event("retry: 3000\ndata: hello", _sink())
+		assert_eq(events, [["hello", "message"]])
+
+	# _drain_sse_buffer
+	func test_drain_emits_complete_lf_events() -> void:
+		var rest := impl._drain_sse_buffer(
+			"data: a\n\ndata: b\n\n".to_utf8_buffer(), _sink()
+		)
+		assert_eq(events, [["a", "message"], ["b", "message"]])
+		assert_eq(rest.size(), 0)
+
+	func test_drain_emits_complete_crlf_events() -> void:
+		var rest := impl._drain_sse_buffer(
+			"data: a\r\n\r\ndata: b\r\n\r\n".to_utf8_buffer(), _sink()
+		)
+		assert_eq(events, [["a", "message"], ["b", "message"]])
+		assert_eq(rest.size(), 0)
+
+	func test_drain_retains_trailing_partial_event() -> void:
+		var rest := impl._drain_sse_buffer(
+			"data: a\n\ndata: b".to_utf8_buffer(), _sink()
+		)
+		assert_eq(events, [["a", "message"]])
+		assert_eq(rest.get_string_from_utf8(), "data: b")
+
+	func test_drain_keeps_split_multibyte_char_intact() -> void:
+		# "héllo" — the 'é' is two UTF-8 bytes; the buffer ends mid-character with
+		# no boundary yet, so nothing is dispatched and all bytes are retained.
+		var partial := "data: h".to_utf8_buffer()
+		partial.append(0xC3) # first byte of 'é'
+		var rest := impl._drain_sse_buffer(partial, _sink())
+		assert_eq(events, [])
+		assert_eq(rest, partial)
+
+	func test_drain_empty_buffer_emits_nothing() -> void:
+		var rest := impl._drain_sse_buffer(PackedByteArray(), _sink())
+		assert_eq(events, [])
+		assert_eq(rest.size(), 0)
+
+	# Multi-byte UTF-8 character split across two socket reads — the core reason
+	# the parser buffers raw bytes and slices on the ASCII delimiter.
+	func test_emoji_split_mid_payload_reassembled() -> void:
+		# "data: a😀b\n\n" with the emoji's 4 bytes split 2/2 across reads.
+		var emoji := _EMOJI.to_utf8_buffer()
+		var first := "data: a".to_utf8_buffer()
+		first.append_array(emoji.slice(0, 2))
+		var second := emoji.slice(2)
+		second.append_array("b\n\n".to_utf8_buffer())
+		_feed_two_reads(first, second)
+		assert_eq(events, [["a" + _EMOJI + "b", "message"]])
+
+	func test_emoji_split_emits_no_replacement_char() -> void:
+		# Guards against per-chunk decoding, which would leave U+FFFD on each half.
+		var emoji := _EMOJI.to_utf8_buffer()
+		var first := "data: ".to_utf8_buffer()
+		first.append_array(emoji.slice(0, 2))
+		var second := emoji.slice(2)
+		second.append_array("\n\n".to_utf8_buffer())
+		_feed_two_reads(first, second)
+		assert_false(events[0][0].contains("�"), "no replacement char in payload")
+
+	func test_em_dash_split_at_event_boundary_reassembled() -> void:
+		# The em-dash is the last character before the \n\n boundary, split 1/2 so
+		# it lands mid-character right at the event boundary.
+		var dash := _EM_DASH.to_utf8_buffer()
+		var first := "data: hi".to_utf8_buffer()
+		first.append_array(dash.slice(0, 1))
+		var second := dash.slice(1)
+		second.append_array("\n\n".to_utf8_buffer())
+		_feed_two_reads(first, second)
+		assert_eq(events, [["hi" + _EM_DASH, "message"]])
+
+	# _find_sse_boundary
+	func test_find_boundary_lf() -> void:
+		assert_eq(impl._find_sse_boundary("a\n\nb".to_utf8_buffer()), Vector2i(1, 3))
+
+	func test_find_boundary_crlf() -> void:
+		assert_eq(
+			impl._find_sse_boundary("a\r\n\r\nb".to_utf8_buffer()), Vector2i(2, 5)
+		)
+
+	func test_find_boundary_none() -> void:
+		assert_eq(
+			impl._find_sse_boundary("data: a\n".to_utf8_buffer()), Vector2i(-1, -1)
+		)
 
 
 ## Unit tests for redirect method and body downgrade logic.

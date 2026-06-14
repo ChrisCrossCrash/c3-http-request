@@ -9,6 +9,7 @@ func _ready() -> void:
 	await demo_body_size_limit()
 	await demo_download_file()
 	await demo_cancellation()
+	await demo_sse()
 	print("\nDone.")
 
 
@@ -123,6 +124,43 @@ func demo_cancellation() -> void:
 	)
 	print("ok:    ", res.ok)
 	print("error: ", str(res.error))
+
+
+func demo_sse() -> void:
+	print("\n--- Server-Sent Events ---")
+	# Wikimedia EventStreams is a real, public, never-ending SSE feed of recent
+	# wiki edits (https://stream.wikimedia.org). Setting Options.on_event parses
+	# the response as a stream and fires the callback per event; the await below
+	# resolves only once the stream closes. Since the feed never ends, we cancel
+	# the token from inside the callback after a few events — the same mechanism
+	# used to tear down any long-lived stream.
+	var token := C3HTTPRequest.CancellationToken.new()
+	var opts := C3HTTPRequest.Options.new()
+	opts.cancellation_token = token
+	# A single-element Array so the callback's mutation is visible out here:
+	# lambdas capture value types (like an int) by copy, but Array by reference.
+	var counter := [0]
+	opts.on_event = func(data: String, event_type: String) -> void:
+		counter[0] += 1
+		var title := "?"
+		var parsed: Variant = JSON.parse_string(data)
+		if parsed is Dictionary:
+			title = str(parsed.get("title", "?"))
+		print("event %d [%s]: %s" % [counter[0], event_type, title])
+		if counter[0] >= 3:
+			token.cancel()
+	var res := await C3HTTPRequest.request(
+		"https://stream.wikimedia.org/v2/stream/recentchange",
+		PackedStringArray(["User-Agent: c3-http-request-demo (https://github.com)"]),
+		C3HTTPRequest.Method.GET,
+		"",
+		opts
+	)
+	# Cancelling is how we chose to end the stream, so ok is false with a
+	# CANCELLED error here — that is the expected, successful outcome.
+	print("received: ", counter[0], " events")
+	print("ended ok: ", res.ok)
+	print("error:    ", str(res.error))
 
 
 func _header_value(headers: PackedStringArray, header_name: String) -> String:
