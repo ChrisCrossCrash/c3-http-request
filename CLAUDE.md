@@ -6,16 +6,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 C3 HTTP Request for Godot is a Godot 4 addon providing a static, async HTTP client that requires no scene tree. Callers `await C3HTTPRequest.request(...)` and check `response.ok` — a single check that covers transport failures, timeouts, and non-2xx statuses alike. The implementation uses `HTTPClient` (a `RefCounted`) with a cooperative polling loop, so it works from any script context without adding a `Node`.
 
-Deliberately out of scope: retries, caching, cookies, middleware, typed deserialization, and JSON-specific handling.
-
 ## Commands
 
 **Run all tests:**
+
 ```
 godot --headless --path . -s addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit
 ```
 
 **Run a single test file:**
+
 ```
 godot --headless --path . -s addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit -gtest=res://tests/test_c3_http_request.gd
 ```
@@ -25,6 +25,7 @@ If GUT reports "does not extend GutTest" or "Nothing was run" after files or cla
 Tests require Godot 4.6+ on `$PATH`. CI runs on ubuntu-latest with Godot 4.6.2-stable via `.github/workflows/tests.yml` (which runs the `--import` step before GUT).
 
 **Build asset for distribution:**
+
 ```
 python scripts/build_asset.py <version>
 ```
@@ -34,10 +35,12 @@ python scripts/build_asset.py <version>
 The addon is a single script: [c3_http_request/c3_http_request.gd](c3_http_request/c3_http_request.gd).
 
 **`C3HTTPRequest`** — No `extends`, no `@tool`. Public surface:
+
 - `static func request(url, custom_headers, method, request_data, options)` → `Response` — the one async entry point. Delegates to `_impl.execute()`.
 - `static var _impl: _Impl` — swapped in tests for a `TestableImpl` subclass that intercepts calls without making real network requests.
 
 **Inner classes:**
+
 - `Method` enum — `GET`, `HEAD`, `POST`, `PUT`, `DELETE`, `OPTIONS`, `PATCH`
 - `Options` — `timeout`, `body_size_limit`, `download_chunk_size`, `accept_gzip`, `max_redirects`, `download_file`, `tls_options`, `proxy_host`, `proxy_port`, `cancellation_token`, `on_event` (SSE streaming sink)
 - `Response` — `ok: bool`, `error: RequestError`, `status: int`, `headers: PackedStringArray`, `body: String`
@@ -57,10 +60,11 @@ Follow [CONTRIBUTING.md](CONTRIBUTING.md) strictly. Key rules:
 - **Type hints are mandatory** on all parameters and return types. Use `:=` for inference; use explicit type when inference would be too broad (e.g., `instantiate()` calls).
 - Signal awaits require explicit type annotation (GDScript limitation); function awaits may use `:=`.
 - Multi-line function signatures: closing `)` goes on its own line at zero indent, before `->`.
-- `##` doc comments for classes, `@export` vars, and public methods. `#` for private methods only when non-obvious. Comments explain *why*, not *what*.
+- `##` doc comments for classes, `@export` vars, and public methods. `#` for private methods only when non-obvious. Comments explain _why_, not _what_.
 - Private members and methods prefixed with `_`.
 
 **Declaration order within a class:**
+
 1. `class_name` / `extends`
 2. Class-level `##` doc comment
 3. Signals → Enums → Constants → `@export` vars → public vars → private vars → `@onready` vars

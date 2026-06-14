@@ -109,6 +109,15 @@ class Options:
 	## ([code]\n\n[/code]) and CRLF ([code]\r\n\r\n[/code]) event delimiters are
 	## supported.
 	var on_event: Callable = Callable()
+	## Optional [Callable] invoked as the response body downloads, as
+	## [code]on_progress.call(bytes_received: int, total_bytes: int)[/code].
+	## [code]bytes_received[/code] is the cumulative byte count;
+	## [code]total_bytes[/code] is the [code]Content-Length[/code], or
+	## [code]-1[/code] when unknown (e.g. a chunked response). Fires once per
+	## non-empty chunk for both in-memory and [member download_file] downloads.
+	## Has no effect in SSE mode (see [member on_event]), where [member on_event]
+	## is the incremental signal instead.
+	var on_progress: Callable = Callable()
 
 
 ## The response returned by [method C3HTTPRequest.request].
@@ -344,6 +353,9 @@ class _Impl:
 		var body_bytes := PackedByteArray()
 		var sse_buffer := PackedByteArray()
 		var last_recv_ms := start_ms
+		# Content-Length if the server sent one, else -1 (e.g. chunked responses).
+		var total_bytes := client.get_response_body_length()
+		var bytes_received := 0
 		while client.get_status() == HTTPClient.STATUS_BODY:
 			# While streaming, timeout is idle time since the last bytes, not total
 			# stream duration — a healthy long-lived stream must not be cut off.
@@ -394,6 +406,9 @@ class _Impl:
 				file.store_buffer(chunk)
 			else:
 				body_bytes.append_array(chunk)
+			bytes_received += chunk.size()
+			if options.on_progress.is_valid():
+				options.on_progress.call(bytes_received, total_bytes)
 
 		if file != null:
 			file.close()

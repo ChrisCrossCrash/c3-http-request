@@ -18,6 +18,7 @@ else:
 - `request_raw()` companion for sending a raw `PackedByteArray` body (binary payloads) unencoded
 - Cancellation token — cancel an in-flight request from another coroutine or signal handler
 - Server-Sent Events (SSE) — pass an `on_event` callback to consume a streaming `text/event-stream` response incrementally
+- Download progress — pass an `on_progress` callback to track `(bytes_received, total_bytes)` as the body arrives
 - Automatic gzip/deflate decompression when the server sends compressed responses
 - Redirect following with a configurable depth limit
 
@@ -42,7 +43,7 @@ else:
 | Binary response body in memory          |       ✓       |            ✓            |
 | Raw request body (bytes)                |       ✓       |            ✓            |
 | HTTP/HTTPS proxy                        |       ✓       |            ✓            |
-| Download progress events                |       —       |            ✓            |
+| Download progress events                |       ✓       |            ✓            |
 | Threaded requests (off main loop)       |       —       |            ✓            |
 
 <sub>\* When `Options.download_file` is set, the response body is written to disk as-is — decompression is skipped and the file may contain raw compressed bytes.</sub>
@@ -118,6 +119,7 @@ var res3 := await C3HTTPRequest.request(url, PackedStringArray(), C3HTTPRequest.
 | `proxy_port`          | `int`               | `-1`    | Port of `proxy_host`. Ignored when `proxy_host` is empty.                                                                 |
 | `cancellation_token`  | `CancellationToken` | `null`  | Token for cancelling the request. `null` disables cancellation support.                                                   |
 | `on_event`            | `Callable`          | empty   | When set, parse a 2xx body as an SSE stream and invoke this per event. See [Server-Sent Events](#server-sent-events-sse). |
+| `on_progress`         | `Callable`          | empty   | When set, invoke `(bytes_received, total_bytes)` per chunk as the body downloads. See [Download progress](#download-progress).                  |
 
 ## Error handling
 
@@ -173,3 +175,20 @@ Behavior while streaming:
 - **`timeout` becomes an idle timeout** — the maximum seconds _between_ events, not a total deadline — so a healthy long-lived stream is never cut off. A stalled connection still fails with `Kind.TIMEOUT`. Use `0.0` to disable.
 - **`accept_gzip` and `download_file` are ignored** while streaming.
 - **Stop a stream** by cancelling its `cancellation_token` (see [Cancellation](#cancellation)); the `await` then resolves with `Kind.CANCELLED`.
+
+## Download progress
+
+Set `Options.on_progress` to a `Callable` to track a download as it arrives. The callback fires once per chunk — `on_progress.call(bytes_received, total_bytes)` — where `bytes_received` is the cumulative count so far and `total_bytes` is the `Content-Length`, or `-1` when the server doesn't send one (e.g. a chunked response). Compute a percentage only when `total_bytes` is positive.
+
+```gdscript
+var opts := C3HTTPRequest.Options.new()
+opts.on_progress = func(bytes_received: int, total_bytes: int) -> void:
+    if total_bytes > 0:
+        print("%d%%" % (bytes_received * 100 / total_bytes))
+    else:
+        print("%d bytes" % bytes_received)  # length unknown
+
+var res := await C3HTTPRequest.request("https://example.com/large.bin", PackedStringArray(), C3HTTPRequest.Method.GET, "", opts)
+```
+
+Works for both in-memory and `download_file` downloads. `bytes_received` counts raw bytes off the wire, so it may differ from the final `res.body.size()` when a gzip/deflate body is decompressed after the transfer completes. It has no effect in SSE mode (`on_event`), where the events themselves are the incremental signal.

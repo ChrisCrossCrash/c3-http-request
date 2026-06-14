@@ -8,9 +8,11 @@ func _ready() -> void:
 	await demo_timeout()
 	await demo_body_size_limit()
 	await demo_download_file()
+	await demo_progress()
 	await demo_cancellation()
 	await demo_sse()
 	print("\nDone.")
+	get_tree().quit()
 
 
 func demo_get() -> void:
@@ -104,6 +106,39 @@ func demo_download_file() -> void:
 	# res.body is empty when download_file is set — data went straight to disk.
 	print("res.body empty: ", res.body.is_empty())
 	print("file:           ", FileAccess.get_file_as_string(path).strip_edges())
+
+
+func demo_progress() -> void:
+	print("\n--- Download progress ---")
+	# httpbin returns a 100 KB body with a Content-Length, so total_bytes is
+	# known and a percentage can be shown. A small download_chunk_size makes the
+	# body arrive in several reads, so on_progress fires multiple times.
+	# accept_gzip is disabled so the transferred bytes match the Content-Length
+	# (gzip would report the compressed size instead).
+	var opts := C3HTTPRequest.Options.new()
+	opts.accept_gzip = false
+	opts.download_chunk_size = 16384
+	opts.on_progress = func(bytes_received: int, total_bytes: int) -> void:
+		if total_bytes > 0:
+			var percent := int(float(bytes_received) / total_bytes * 100.0)
+			print("progress: %d / %d bytes (%d%%)" % [
+				bytes_received, total_bytes, percent
+			])
+		else:
+			# Chunked responses have no Content-Length, so total_bytes is -1.
+			print("progress: %d bytes (total unknown)" % bytes_received)
+	var res := await C3HTTPRequest.request(
+		"https://httpbin.org/bytes/102400",
+		PackedStringArray(),
+		C3HTTPRequest.Method.GET,
+		"",
+		opts
+	)
+	if not res.ok:
+		print("error: ", str(res.error))
+		return
+	print("status:     ", res.status)
+	print("downloaded: ", res.body.size(), " bytes")
 
 
 func demo_cancellation() -> void:
