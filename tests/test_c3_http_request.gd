@@ -310,6 +310,46 @@ class TestResponse extends GutTest:
 		res.body = "😎".to_utf8_buffer()
 		assert_eq(res.text, "😎")
 
+	func test_text_empty_body_no_error() -> void:
+		assert_eq(C3HTTPRequest.Response.new().text, "")
+
+	func test_json_parses_object() -> void:
+		var res := C3HTTPRequest.Response.new()
+		res.body = '{"a":1}'.to_utf8_buffer()
+		var parsed: Variant = res.json
+		assert_true(parsed is Dictionary)
+		assert_eq(parsed["a"], 1.0)
+
+	func test_json_parses_array() -> void:
+		var res := C3HTTPRequest.Response.new()
+		res.body = "[1,2,3]".to_utf8_buffer()
+		var parsed: Variant = res.json
+		assert_true(parsed is Array)
+		assert_eq((parsed as Array).size(), 3)
+
+	func test_json_default_is_null() -> void:
+		assert_null(C3HTTPRequest.Response.new().json)
+		assert_push_error("not valid JSON")
+
+	func test_json_literal_null() -> void:
+		var res := C3HTTPRequest.Response.new()
+		res.body = "null".to_utf8_buffer()
+		assert_null(res.json)
+		assert_push_error_count(0)
+
+	func test_json_invalid_returns_null() -> void:
+		var res := C3HTTPRequest.Response.new()
+		res.body = "not json".to_utf8_buffer()
+		assert_null(res.json)
+		assert_push_error("not valid JSON")
+
+	func test_json_cached() -> void:
+		var res := C3HTTPRequest.Response.new()
+		res.body = '{"a":1}'.to_utf8_buffer()
+		var first: Variant = res.json
+		var second: Variant = res.json
+		assert_eq(first, second)
+
 
 ## Tests for [C3HTTPRequest.Options] defaults.
 class TestOptions extends GutTest:

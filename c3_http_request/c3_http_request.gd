@@ -151,9 +151,36 @@ class Response:
 		get:
 			if _text_cache == null:
 				_text_cache = body.get_string_from_utf8()
+				if _text_cache == "" and not body.is_empty():
+					push_error(
+						"C3HTTPRequest: response body is not valid UTF-8."
+					)
 			return _text_cache
 
 	var _text_cache: Variant = null
+
+	## The response body parsed as JSON. Parsed lazily on first access and cached,
+	## reusing the [member text] decode. On a parse failure this pushes an error
+	## (once, at parse time) and returns [code]null[/code]. Note that a successful
+	## parse of a literal JSON [code]null[/code] body also returns [code]null[/code].
+	var json: Variant:
+		get:
+			if not _json_parsed:
+				_json_parsed = true
+				var parser := JSON.new()
+				var err := parser.parse(text)
+				if err == OK:
+					_json_cache = parser.data
+				else:
+					push_error(
+						"C3HTTPRequest: response body is not valid JSON: "
+						+ parser.get_error_message()
+					)
+					_json_cache = null
+			return _json_cache
+
+	var _json_parsed := false
+	var _json_cache: Variant = null
 
 
 ## Structured error placed on [member Response.error] when

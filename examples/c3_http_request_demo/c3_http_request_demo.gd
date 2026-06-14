@@ -29,6 +29,10 @@ func demo_get() -> void:
 	print("status:       ", res.status)
 	print("content-type: ", _header_value(res.headers, "Content-Type"))
 	print("body:         ", res.text)
+	# res.json parses the body once and caches it; pull out a field directly.
+	var parsed: Variant = res.json
+	if parsed is Dictionary:
+		print("json.title:   ", parsed.get("title", ""))
 
 
 func demo_post() -> void:

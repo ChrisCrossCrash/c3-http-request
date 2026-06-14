@@ -31,6 +31,7 @@ else:
 | `await`-able (no signal wiring)         |       ✓       |            —            |
 | Single `ok` check (transport + non-2xx) |       ✓       |            —            |
 | Decoded `text` body accessor            |       ✓       |            —            |
+| Parsed `json` body accessor             |       ✓       |            —            |
 | Server-Sent Events (SSE) streaming      |       ✓       |            —            |
 | Typed `RequestError` with `Kind`        |       ✓       | — (integer result code) |
 | Concurrent requests                     |   Unlimited   |      One per node       |
@@ -68,6 +69,7 @@ if not res.ok:
     return
 print(res.status)  # 200
 print(res.text)    # response body decoded as UTF-8
+print(res.json)    # response body parsed as JSON (Variant; null if invalid)
 print(res.body)    # raw response body bytes (PackedByteArray)
 
 # POST with a JSON body and custom headers
@@ -104,6 +106,7 @@ var res3 := await C3HTTPRequest.request(url, PackedStringArray(), C3HTTPRequest.
 | `headers` | `PackedStringArray` | Response headers as `"Name: Value"` strings. Empty on transport failure.                    |
 | `body`    | `PackedByteArray`   | Raw response body bytes. Empty when `Options.download_file` is set or no body was received. |
 | `text`    | `String`            | `body` decoded as UTF-8. Computed lazily on first access and cached.                        |
+| `json`    | `Variant`           | `body` parsed as JSON. Parsed lazily on first access and cached. `null` (and a pushed error) on invalid JSON. |
 | `error`   | `RequestError`      | Error details when `ok` is `false`; `null` otherwise.                                       |
 
 ## Options
