@@ -112,6 +112,8 @@ class RequestError:
 		CANCELLED,
 		## No response was received before the timeout elapsed.
 		TIMEOUT,
+		## The response body exceeded [member Options.body_size_limit].
+		BODY_SIZE_LIMIT_EXCEEDED,
 	}
 	## Broad category of failure. One of the [enum Kind] values.
 	var kind: Kind = Kind.TRANSPORT
@@ -145,6 +147,13 @@ class RequestError:
 	static func cancelled(p_message: String) -> RequestError:
 		var e := RequestError.new()
 		e.kind = Kind.CANCELLED
+		e.message = p_message
+		return e
+
+	## Builds an error for a response body that exceeded [member Options.body_size_limit].
+	static func body_size_limit_exceeded(p_message: String) -> RequestError:
+		var e := RequestError.new()
+		e.kind = Kind.BODY_SIZE_LIMIT_EXCEEDED
 		e.message = p_message
 		return e
 
@@ -301,7 +310,7 @@ class _Impl:
 			):
 				if file != null:
 					file.close()
-				return _fail(C3HTTPRequest.RequestError.transport(
+				return _fail(C3HTTPRequest.RequestError.body_size_limit_exceeded(
 					"Response body exceeded limit of %d bytes."
 					% options.body_size_limit
 				))

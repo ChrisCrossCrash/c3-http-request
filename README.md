@@ -114,8 +114,9 @@ When `res.ok` is `false`, `res.error` is a `RequestError` describing what went w
 | `RequestError.Kind.TRANSPORT` | No usable HTTP response (DNS, connection, TLS, or request could not start) |
 | `RequestError.Kind.HTTP`      | A non-2xx status was received                                              |
 | `RequestError.Kind.CLIENT`    | The request was rejected before being sent (e.g. an invalid URL)           |
-| `RequestError.Kind.TIMEOUT`   | No response was received before `Options.timeout` elapsed                  |
-| `RequestError.Kind.CANCELLED` | The request was cancelled via a `CancellationToken`                        |
+| `RequestError.Kind.TIMEOUT`                  | No response was received before `Options.timeout` elapsed                  |
+| `RequestError.Kind.CANCELLED`               | The request was cancelled via a `CancellationToken`                        |
+| `RequestError.Kind.BODY_SIZE_LIMIT_EXCEEDED` | The response body exceeded `Options.body_size_limit`                       |
 
 `str(error)` produces a compact one-line summary: `[transport] Could not connect.` or `[http] status=404 Request failed with status 404.`
 

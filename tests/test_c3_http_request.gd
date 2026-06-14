@@ -187,6 +187,16 @@ class TestRequestError extends GutTest:
 		var s := str(RequestError.timed_out("Timed out."))
 		assert_string_contains(s, "[timeout]")
 
+	func test_body_size_limit_exceeded_factory() -> void:
+		var e := RequestError.body_size_limit_exceeded("Body too large.")
+		assert_eq(e.kind, RequestError.Kind.BODY_SIZE_LIMIT_EXCEEDED)
+		assert_eq(e.message, "Body too large.")
+		assert_eq(e.status, 0)
+
+	func test_to_string_body_size_limit_exceeded() -> void:
+		var s := str(RequestError.body_size_limit_exceeded("Body too large."))
+		assert_string_contains(s, "[body_size_limit_exceeded]")
+
 
 ## Tests for [C3HTTPRequest.Response] defaults.
 class TestResponse extends GutTest:
