@@ -37,7 +37,9 @@ static func request(
 	options: Options = null
 ) -> Response:
 	var opts: Options = options if options != null else Options.new()
-	return await _impl.execute(url, custom_headers, _METHOD_MAP[method], request_data, opts)
+	return await _impl.execute(
+		url, custom_headers, _METHOD_MAP[method], request_data, opts
+	)
 
 
 ## Per-request configuration. Defaults match [HTTPRequest] node defaults.
@@ -178,7 +180,7 @@ class _Impl:
 		var parsed := _parse_url(url)
 		if parsed.is_empty():
 			return _fail(C3HTTPRequest.RequestError.client_error(
-				"Invalid URL: \"%s\"." % url
+					'Invalid URL: "%s".' % url
 			))
 
 		var file: FileAccess = null
@@ -200,7 +202,8 @@ class _Impl:
 		var err: int
 		if parsed["tls"]:
 			var tls: TLSOptions = (
-				options.tls_options if options.tls_options != null
+				options.tls_options
+				if options.tls_options != null
 				else TLSOptions.client()
 			)
 			err = client.connect_to_host(parsed["host"], parsed["port"], tls)
@@ -225,7 +228,9 @@ class _Impl:
 					"Timed out while connecting."
 				))
 			if _cancelled(options):
-				return _fail(C3HTTPRequest.RequestError.cancelled("Request was cancelled."))
+				return _fail(C3HTTPRequest.RequestError.cancelled(
+						"Request was cancelled."
+				))
 			await tree.process_frame
 
 		if client.get_status() != HTTPClient.STATUS_CONNECTED:
@@ -248,11 +253,15 @@ class _Impl:
 					"Timed out waiting for response."
 				))
 			if _cancelled(options):
-				return _fail(C3HTTPRequest.RequestError.cancelled("Request was cancelled."))
+				return _fail(C3HTTPRequest.RequestError.cancelled(
+					"Request was cancelled."
+				))
 			await tree.process_frame
 
 		if not client.has_response():
-			return _fail(C3HTTPRequest.RequestError.transport("No response received."))
+			return _fail(C3HTTPRequest.RequestError.transport(
+				"No response received."
+			))
 
 		var status := client.get_response_code()
 		var resp_headers: PackedStringArray = client.get_response_headers()
@@ -268,7 +277,9 @@ class _Impl:
 			if _cancelled(options):
 				if file != null:
 					file.close()
-				return _fail(C3HTTPRequest.RequestError.cancelled("Request was cancelled."))
+				return _fail(C3HTTPRequest.RequestError.cancelled(
+					"Request was cancelled."
+				))
 			client.poll()
 			var chunk: PackedByteArray = client.read_response_body_chunk()
 			if chunk.is_empty():
@@ -281,7 +292,8 @@ class _Impl:
 				if file != null:
 					file.close()
 				return _fail(C3HTTPRequest.RequestError.transport(
-					"Response body exceeded limit of %d bytes." % options.body_size_limit
+					"Response body exceeded limit of %d bytes."
+					% options.body_size_limit
 				))
 			if file != null:
 				file.store_buffer(chunk)
@@ -308,12 +320,17 @@ class _Impl:
 			if not location.is_empty():
 				return await execute(
 					_resolve_redirect_url(
-						location, parsed["host"], parsed["port"], parsed["tls"], parsed["path"]
+						location,
+						parsed["host"],
+						parsed["port"],
+						parsed["tls"],
+						parsed["path"]
 					),
 					custom_headers,
 					_redirect_method(method, status),
 					_redirect_body(method, status, request_data),
-					options, redirects_left - 1
+					options,
+					redirects_left - 1
 				)
 
 		var res := C3HTTPRequest.Response.new()
@@ -359,7 +376,12 @@ class _Impl:
 			if port_str.is_valid_int():
 				port = port_str.to_int()
 			host = host_part.substr(0, colon)
-		return {"host": host, "port": port, "path": path, "tls": scheme == "https"}
+		return {
+			"host": host,
+			"port": port,
+			"path": path,
+			"tls": scheme == "https"
+		}
 
 	func _timed_out(start_ms: int, timeout: float) -> bool:
 		if timeout <= 0.0:
@@ -393,7 +415,12 @@ class _Impl:
 		if location.begins_with("/"):
 			return scheme + "://" + authority + _normalize_path(location)
 		var slash := base_path.rfind("/")
-		return scheme + "://" + authority + _normalize_path(base_path.substr(0, slash + 1) + location)
+		return (
+			scheme
+			+ "://"
+			+ authority
+			+ _normalize_path(base_path.substr(0, slash + 1) + location)
+		)
 
 	# Removes . and .. segments from an absolute path per RFC 3986 §5.2.4.
 	func _normalize_path(path: String) -> String:
@@ -410,12 +437,20 @@ class _Impl:
 	# historically switch POST to GET but preserve other methods (§15.4.2–15.4.3).
 	# 307/308 explicitly require preserving the original method and body (§15.4.8–15.4.9).
 	func _redirect_method(method: int, status: int) -> int:
-		if status == 303 or (status in [301, 302] and method == HTTPClient.METHOD_POST):
+		if (
+			status == 303
+			or (status in [301, 302] and method == HTTPClient.METHOD_POST)
+		):
 			return HTTPClient.METHOD_GET
 		return method
 
-	func _redirect_body(method: int, status: int, request_data: String) -> String:
-		if status == 303 or (status in [301, 302] and method == HTTPClient.METHOD_POST):
+	func _redirect_body(
+		method: int, status: int, request_data: String
+	) -> String:
+		if (
+			status == 303
+			or (status in [301, 302] and method == HTTPClient.METHOD_POST)
+		):
 			return ""
 		return request_data
 

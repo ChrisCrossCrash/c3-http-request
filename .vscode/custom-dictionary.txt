@@ -45,6 +45,7 @@ onready
 randf
 randfn
 respawn
+rfind
 RGBA
 SCROLLLOCK
 smoothstep

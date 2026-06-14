@@ -61,7 +61,10 @@ func demo_timeout() -> void:
 	opts.timeout = 0.001  # 1 ms — fires before any real response arrives
 	var res := await C3HTTPRequest.request(
 		"https://jsonplaceholder.typicode.com/todos/1",
-		PackedStringArray(), C3HTTPRequest.Method.GET, "", opts
+		PackedStringArray(),
+		C3HTTPRequest.Method.GET,
+		"",
+		opts
 	)
 	print("ok:    ", res.ok)
 	print("error: ", str(res.error))
@@ -73,7 +76,10 @@ func demo_body_size_limit() -> void:
 	opts.body_size_limit = 1000  # /posts returns ~27 KB
 	var res := await C3HTTPRequest.request(
 		"https://jsonplaceholder.typicode.com/posts",
-		PackedStringArray(), C3HTTPRequest.Method.GET, "", opts
+		PackedStringArray(),
+		C3HTTPRequest.Method.GET,
+		"",
+		opts
 	)
 	print("ok:    ", res.ok)
 	print("error: ", str(res.error))
@@ -86,7 +92,10 @@ func demo_download_file() -> void:
 	opts.download_file = path
 	var res := await C3HTTPRequest.request(
 		"https://jsonplaceholder.typicode.com/todos/1",
-		PackedStringArray(), C3HTTPRequest.Method.GET, "", opts
+		PackedStringArray(),
+		C3HTTPRequest.Method.GET,
+		"",
+		opts
 	)
 	if not res.ok:
 		print("error: ", str(res.error))
@@ -107,7 +116,10 @@ func demo_cancellation() -> void:
 	token.cancel()
 	var res := await C3HTTPRequest.request(
 		"https://jsonplaceholder.typicode.com/todos/1",
-		PackedStringArray(), C3HTTPRequest.Method.GET, "", opts
+		PackedStringArray(),
+		C3HTTPRequest.Method.GET,
+		"",
+		opts
 	)
 	print("ok:    ", res.ok)
 	print("error: ", str(res.error))

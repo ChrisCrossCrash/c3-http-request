@@ -54,22 +54,27 @@ class TestRequest extends GutTest:
 
 	func test_method_is_forwarded() -> void:
 		await C3HTTPRequest.request(
-			"https://example.com", PackedStringArray(), C3HTTPRequest.Method.POST
+			"https://example.com",
+			PackedStringArray(),
+			C3HTTPRequest.Method.POST
 		)
 		assert_eq(impl.call_log[0]["method"], HTTPClient.METHOD_POST)
 
 	func test_custom_headers_forwarded() -> void:
 		await C3HTTPRequest.request(
-			"https://example.com",
-			PackedStringArray(["X-Custom: value"])
+			"https://example.com", PackedStringArray(["X-Custom: value"])
 		)
 		assert_eq(
-			impl.call_log[0]["custom_headers"], PackedStringArray(["X-Custom: value"])
+			impl.call_log[0]["custom_headers"],
+			PackedStringArray(["X-Custom: value"])
 		)
 
 	func test_request_data_forwarded() -> void:
 		await C3HTTPRequest.request(
-			"https://example.com", PackedStringArray(), C3HTTPRequest.Method.POST, "hello"
+			"https://example.com",
+			PackedStringArray(),
+			C3HTTPRequest.Method.POST,
+			"hello"
 		)
 		assert_eq(impl.call_log[0]["request_data"], "hello")
 
@@ -85,7 +90,13 @@ class TestRequest extends GutTest:
 		var opts := C3HTTPRequest.Options.new()
 		opts.timeout = 5.0
 		opts.max_redirects = 0
-		await C3HTTPRequest.request("https://example.com", PackedStringArray(), C3HTTPRequest.Method.GET, "", opts)
+		await C3HTTPRequest.request(
+			"https://example.com",
+			PackedStringArray(),
+			C3HTTPRequest.Method.GET,
+			"",
+			opts
+		)
 		assert_eq(impl.call_log[0]["options"], opts)
 
 	func test_2xx_response_is_ok() -> void:
@@ -108,7 +119,9 @@ class TestRequest extends GutTest:
 
 	func test_failed_response_is_not_ok() -> void:
 		impl.preset.ok = false
-		impl.preset.error = C3HTTPRequest.RequestError.transport("Could not connect.")
+		impl.preset.error = C3HTTPRequest.RequestError.transport(
+			"Could not connect."
+		)
 		var res := await C3HTTPRequest.request("https://example.com")
 		assert_false(res.ok)
 
@@ -236,7 +249,11 @@ class TestCancellationToken extends GutTest:
 		var opts := C3HTTPRequest.Options.new()
 		opts.cancellation_token = token
 		var res: C3HTTPRequest.Response = await C3HTTPRequest._Impl.new().execute(
-			"https://example.com", PackedStringArray(), HTTPClient.METHOD_GET, "", opts
+			"https://example.com",
+			PackedStringArray(),
+			HTTPClient.METHOD_GET,
+			"",
+			opts
 		)
 		assert_false(res.ok)
 		assert_eq(res.error.kind, C3HTTPRequest.RequestError.Kind.CANCELLED)
@@ -247,7 +264,11 @@ class TestCancellationToken extends GutTest:
 		var opts := C3HTTPRequest.Options.new()
 		opts.cancellation_token = token
 		var res: C3HTTPRequest.Response = await C3HTTPRequest._Impl.new().execute(
-			"https://example.com", PackedStringArray(), HTTPClient.METHOD_GET, "", opts
+			"https://example.com",
+			PackedStringArray(),
+			HTTPClient.METHOD_GET,
+			"",
+			opts
 		)
 		assert_string_contains(str(res.error), "[cancelled]")
 
@@ -261,28 +282,52 @@ class TestRedirectSemantics extends GutTest:
 
 	# _redirect_method
 	func test_301_post_becomes_get() -> void:
-		assert_eq(impl._redirect_method(HTTPClient.METHOD_POST, 301), HTTPClient.METHOD_GET)
+		assert_eq(
+			impl._redirect_method(HTTPClient.METHOD_POST, 301),
+			HTTPClient.METHOD_GET
+		)
 
 	func test_302_post_becomes_get() -> void:
-		assert_eq(impl._redirect_method(HTTPClient.METHOD_POST, 302), HTTPClient.METHOD_GET)
+		assert_eq(
+			impl._redirect_method(HTTPClient.METHOD_POST, 302),
+			HTTPClient.METHOD_GET
+		)
 
 	func test_303_post_becomes_get() -> void:
-		assert_eq(impl._redirect_method(HTTPClient.METHOD_POST, 303), HTTPClient.METHOD_GET)
+		assert_eq(
+			impl._redirect_method(HTTPClient.METHOD_POST, 303),
+			HTTPClient.METHOD_GET
+		)
 
 	func test_303_put_becomes_get() -> void:
-		assert_eq(impl._redirect_method(HTTPClient.METHOD_PUT, 303), HTTPClient.METHOD_GET)
+		assert_eq(
+			impl._redirect_method(HTTPClient.METHOD_PUT, 303),
+			HTTPClient.METHOD_GET
+		)
 
 	func test_301_get_stays_get() -> void:
-		assert_eq(impl._redirect_method(HTTPClient.METHOD_GET, 301), HTTPClient.METHOD_GET)
+		assert_eq(
+			impl._redirect_method(HTTPClient.METHOD_GET, 301),
+			HTTPClient.METHOD_GET
+		)
 
 	func test_301_put_stays_put() -> void:
-		assert_eq(impl._redirect_method(HTTPClient.METHOD_PUT, 301), HTTPClient.METHOD_PUT)
+		assert_eq(
+			impl._redirect_method(HTTPClient.METHOD_PUT, 301),
+			HTTPClient.METHOD_PUT
+		)
 
 	func test_307_post_stays_post() -> void:
-		assert_eq(impl._redirect_method(HTTPClient.METHOD_POST, 307), HTTPClient.METHOD_POST)
+		assert_eq(
+			impl._redirect_method(HTTPClient.METHOD_POST, 307),
+			HTTPClient.METHOD_POST
+		)
 
 	func test_308_post_stays_post() -> void:
-		assert_eq(impl._redirect_method(HTTPClient.METHOD_POST, 308), HTTPClient.METHOD_POST)
+		assert_eq(
+			impl._redirect_method(HTTPClient.METHOD_POST, 308),
+			HTTPClient.METHOD_POST
+		)
 
 	# _redirect_body
 	func test_301_post_drops_body() -> void:
@@ -295,13 +340,19 @@ class TestRedirectSemantics extends GutTest:
 		assert_eq(impl._redirect_body(HTTPClient.METHOD_PUT, 303, "data"), "")
 
 	func test_307_post_preserves_body() -> void:
-		assert_eq(impl._redirect_body(HTTPClient.METHOD_POST, 307, "data"), "data")
+		assert_eq(
+			impl._redirect_body(HTTPClient.METHOD_POST, 307, "data"), "data"
+		)
 
 	func test_308_post_preserves_body() -> void:
-		assert_eq(impl._redirect_body(HTTPClient.METHOD_POST, 308, "data"), "data")
+		assert_eq(
+			impl._redirect_body(HTTPClient.METHOD_POST, 308, "data"), "data"
+		)
 
 	func test_301_put_preserves_body() -> void:
-		assert_eq(impl._redirect_body(HTTPClient.METHOD_PUT, 301, "data"), "data")
+		assert_eq(
+			impl._redirect_body(HTTPClient.METHOD_PUT, 301, "data"), "data"
+		)
 
 
 ## Unit tests for redirect URL resolution.
@@ -313,25 +364,33 @@ class TestResolveRedirectUrl extends GutTest:
 
 	func test_absolute_https_returned_as_is() -> void:
 		assert_eq(
-			impl._resolve_redirect_url("https://other.com/path", "host.com", 443, true, "/old"),
+			impl._resolve_redirect_url(
+				"https://other.com/path", "host.com", 443, true, "/old"
+			),
 			"https://other.com/path"
 		)
 
 	func test_absolute_http_returned_as_is() -> void:
 		assert_eq(
-			impl._resolve_redirect_url("http://other.com/path", "host.com", 80, false, "/old"),
+			impl._resolve_redirect_url(
+				"http://other.com/path", "host.com", 80, false, "/old"
+			),
 			"http://other.com/path"
 		)
 
 	func test_protocol_relative_prepends_https() -> void:
 		assert_eq(
-			impl._resolve_redirect_url("//other.com/path", "host.com", 443, true, "/old"),
+			impl._resolve_redirect_url(
+				"//other.com/path", "host.com", 443, true, "/old"
+			),
 			"https://other.com/path"
 		)
 
 	func test_protocol_relative_prepends_http() -> void:
 		assert_eq(
-			impl._resolve_redirect_url("//other.com/path", "host.com", 80, false, "/old"),
+			impl._resolve_redirect_url(
+				"//other.com/path", "host.com", 80, false, "/old"
+			),
 			"http://other.com/path"
 		)
 
@@ -343,25 +402,33 @@ class TestResolveRedirectUrl extends GutTest:
 
 	func test_absolute_path_on_explicit_port() -> void:
 		assert_eq(
-			impl._resolve_redirect_url("/new", "localhost", 8080, false, "/old"),
+			impl._resolve_redirect_url(
+				"/new", "localhost", 8080, false, "/old"
+			),
 			"http://localhost:8080/new"
 		)
 
 	func test_relative_path_resolved_against_base_dir() -> void:
 		assert_eq(
-			impl._resolve_redirect_url("page", "host.com", 443, true, "/api/v1/"),
+			impl._resolve_redirect_url(
+				"page", "host.com", 443, true, "/api/v1/"
+			),
 			"https://host.com/api/v1/page"
 		)
 
 	func test_relative_path_with_dot_dot() -> void:
 		assert_eq(
-			impl._resolve_redirect_url("../v2/users", "host.com", 443, true, "/api/v1/users"),
+			impl._resolve_redirect_url(
+				"../v2/users", "host.com", 443, true, "/api/v1/users"
+			),
 			"https://host.com/api/v2/users"
 		)
 
 	func test_dot_segment_in_absolute_path() -> void:
 		assert_eq(
-			impl._resolve_redirect_url("/a/b/../c", "host.com", 443, true, "/old"),
+			impl._resolve_redirect_url(
+				"/a/b/../c", "host.com", 443, true, "/old"
+			),
 			"https://host.com/a/c"
 		)
 
