@@ -346,3 +346,11 @@ class TestParseUrl extends GutTest:
 
 	func test_empty_host_returns_empty() -> void:
 		assert_true(impl._parse_url("https:///path").is_empty())
+
+	func test_fragment_stripped_from_path() -> void:
+		var r := impl._parse_url("https://example.com/page#section")
+		assert_eq(r["path"], "/page")
+
+	func test_fragment_stripped_after_query() -> void:
+		var r := impl._parse_url("https://example.com/page?q=1#section")
+		assert_eq(r["path"], "/page?q=1")

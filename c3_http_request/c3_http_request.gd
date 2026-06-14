@@ -345,6 +345,9 @@ class _Impl:
 			path = rest.substr(slash)
 		if host_part.is_empty():
 			return {}
+		var fragment := path.find("#")
+		if fragment != -1:
+			path = path.substr(0, fragment)
 		var port := 443 if scheme == "https" else 80
 		var host := host_part
 		var colon := host_part.find(":")
