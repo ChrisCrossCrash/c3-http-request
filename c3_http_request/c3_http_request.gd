@@ -9,6 +9,9 @@ class_name C3HTTPRequest
 ## HTTP method for [method request].
 enum Method { GET = 0, HEAD, POST, PUT, DELETE, OPTIONS, PATCH }
 
+## The installed version of this addon, e.g. for logging or feature gating.
+const VERSION := "v0.1.0"
+
 const _METHOD_MAP: Dictionary = {
 	Method.GET: HTTPClient.METHOD_GET,
 	Method.HEAD: HTTPClient.METHOD_HEAD,

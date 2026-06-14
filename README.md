@@ -93,7 +93,7 @@ Tested on Godot 4.6.x with automated ([GUT](https://github.com/bitwes/Gut)) test
 
 ## Installation
 
-Download the latest release from GitHub and copy the `addons/c3_http_request-<version>` folder into your project's `addons/` directory. No plugin activation required — `C3HTTPRequest` is available as a global class immediately.
+Download the latest release from GitHub and copy the `addons/c3_http_request` folder into your project's `addons/` directory. No plugin activation required — `C3HTTPRequest` is available as a global class immediately.
 
 ## Quick start
 
