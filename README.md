@@ -1,14 +1,50 @@
 # C3 HTTP Request for Godot
 
-A lightweight, async HTTP client for Godot 4 that requires no scene tree. Call the static `request()` method from anywhere — no node to add, no signal to wire.
+_Like `HTTPRequest`, but better!_
+
+`C3HTTPRequest` is a lightweight, async HTTP client for Godot 4 that covers nearly everything `HTTPRequest` does — and gets out of your way while doing it. There's no `Node` to instantiate, add to the tree, and free; no `request_completed` signal to connect; and no two-step "did the transfer work, _and_ was the status 2xx?" dance. You `await` a single static call and check one field.
+
+Here's the same GET request both ways:
+
+<table>
+<tr><th><code>HTTPRequest</code></th><th><code>C3HTTPRequest</code></th></tr>
+<tr valign="top"><td>
+
+```gdscript
+var http := HTTPRequest.new()
+add_child(http)
+http.request("https://api.example.com/todos/1")
+var result: Array = await http.request_completed
+http.queue_free()
+
+var code: int = result[0]
+var status: int = result[1]
+var body: PackedByteArray = result[3]
+if code == HTTPRequest.RESULT_SUCCESS and status == 200:
+    var text := body.get_string_from_utf8()
+    print(text)
+    var data: Variant = JSON.parse_string(text)
+    if data is Dictionary:
+        print(data["title"])
+else:
+    push_error("Request failed")
+```
+
+</td><td>
 
 ```gdscript
 var res := await C3HTTPRequest.request("https://api.example.com/todos/1")
 if res.ok:
     print(res.text)
+    print(res.json["title"])
 else:
     push_error(str(res.error))
 ```
+
+</td></tr>
+</table>
+
+No node, no signal, no tree — and `res.ok` is a single check that already accounts for transport failures, timeouts, and non-2xx statuses alike. Redirects are followed automatically (up to `Options.max_redirects`), so `res` reflects the final response the chain lands on.
 
 ## Features
 
@@ -25,29 +61,29 @@ else:
 
 ## Comparison with HTTPRequest
 
-| Feature                                 | C3HTTPRequest |       HTTPRequest       |
-| --------------------------------------- | :-----------: | :---------------------: |
-| No Node to add or configure             |       ✓       |            —            |
-| `await`-able (no signal wiring)         |       ✓       |            —            |
-| Single `ok` check (transport + non-2xx) |       ✓       |            —            |
-| Decoded `text` body accessor            |       ✓       |            —            |
-| Parsed `json` body accessor             |       ✓       |            —            |
-| Server-Sent Events (SSE) streaming      |       ✓       |            —            |
-| Typed `RequestError` with `Kind`        |       ✓       | — (integer result code) |
-| Concurrent requests                     |   Unlimited   |      One per node       |
-| Cancellation                            | ✓ Token-based |  ✓ `cancel_request()`   |
-| Timeout                                 |       ✓       |            ✓            |
-| Gzip/deflate decompression              |     ✓ \*      |            ✓            |
-| Redirect following                      |       ✓       |            ✓            |
-| Download to file                        |       ✓       |            ✓            |
-| Body size limit                         |       ✓       |            ✓            |
-| Custom TLS options                      |       ✓       |            ✓            |
-| Binary response body in memory          |       ✓       |            ✓            |
-| Raw request body (bytes)                |       ✓       |            ✓            |
-| HTTP/HTTPS proxy                        |       ✓       |            ✓            |
-| Download progress events                |       ✓       |            ✓            |
-| Connection status callback              |       ✓       |   ✓ `get_http_client_status()`   |
-| Threaded requests (off main loop)       |       —       |            ✓            |
+| Feature                                 | C3HTTPRequest |         HTTPRequest          |
+| --------------------------------------- | :-----------: | :--------------------------: |
+| No Node to add or configure             |       ✓       |              —               |
+| `await`-able (no signal wiring)         |       ✓       |              —               |
+| Single `ok` check (transport + non-2xx) |       ✓       |              —               |
+| Decoded `text` body accessor            |       ✓       |              —               |
+| Parsed `json` body accessor             |       ✓       |              —               |
+| Server-Sent Events (SSE) streaming      |       ✓       |              —               |
+| Typed `RequestError` with `Kind`        |       ✓       |   — (integer result code)    |
+| Concurrent requests                     |   Unlimited   |         One per node         |
+| Cancellation                            | ✓ Token-based |     ✓ `cancel_request()`     |
+| Timeout                                 |       ✓       |              ✓               |
+| Gzip/deflate decompression              |     ✓ \*      |              ✓               |
+| Redirect following                      |       ✓       |              ✓               |
+| Download to file                        |       ✓       |              ✓               |
+| Body size limit                         |       ✓       |              ✓               |
+| Custom TLS options                      |       ✓       |              ✓               |
+| Binary response body in memory          |       ✓       |              ✓               |
+| Raw request body (bytes)                |       ✓       |              ✓               |
+| HTTP/HTTPS proxy                        |       ✓       |              ✓               |
+| Download progress events                |       ✓       |              ✓               |
+| Connection status callback              |       ✓       | ✓ `get_http_client_status()` |
+| Threaded requests (off main loop)       |       —       |              ✓               |
 
 <sub>\* When `Options.download_file` is set, the response body is written to disk as-is — decompression is skipped and the file may contain raw compressed bytes.</sub>
 
@@ -99,33 +135,33 @@ var res3 := await C3HTTPRequest.request(url, PackedStringArray(), C3HTTPRequest.
 
 ## Response
 
-| Field     | Type                | Description                                                                                 |
-| --------- | ------------------- | ------------------------------------------------------------------------------------------- |
-| `ok`      | `bool`              | `true` when a 2xx status was received. Never affected by body content.                      |
-| `status`  | `int`               | HTTP status code, or `0` on transport failure.                                              |
-| `headers` | `PackedStringArray` | Response headers as `"Name: Value"` strings. Empty on transport failure.                    |
-| `body`    | `PackedByteArray`   | Raw response body bytes. Empty when `Options.download_file` is set or no body was received. |
-| `text`    | `String`            | `body` decoded as UTF-8. Computed lazily on first access and cached.                        |
+| Field     | Type                | Description                                                                                                   |
+| --------- | ------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `ok`      | `bool`              | `true` when a 2xx status was received. Never affected by body content.                                        |
+| `status`  | `int`               | HTTP status code, or `0` on transport failure.                                                                |
+| `headers` | `PackedStringArray` | Response headers as `"Name: Value"` strings. Empty on transport failure.                                      |
+| `body`    | `PackedByteArray`   | Raw response body bytes. Empty when `Options.download_file` is set or no body was received.                   |
+| `text`    | `String`            | `body` decoded as UTF-8. Computed lazily on first access and cached.                                          |
 | `json`    | `Variant`           | `body` parsed as JSON. Parsed lazily on first access and cached. `null` (and a pushed error) on invalid JSON. |
-| `error`   | `RequestError`      | Error details when `ok` is `false`; `null` otherwise.                                       |
+| `error`   | `RequestError`      | Error details when `ok` is `false`; `null` otherwise.                                                         |
 
 ## Options
 
-| Property              | Type                | Default | Description                                                                                                               |
-| --------------------- | ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `timeout`             | `float`             | `0.0`   | Maximum seconds to wait. `0.0` disables the timeout.                                                                      |
-| `body_size_limit`     | `int`               | `-1`    | Maximum response body size in bytes. `-1` is unlimited.                                                                   |
-| `download_chunk_size` | `int`               | `65536` | Read buffer size in bytes.                                                                                                |
-| `accept_gzip`         | `bool`              | `true`  | Inject `Accept-Encoding: gzip, deflate` and auto-decompress.                                                              |
-| `max_redirects`       | `int`               | `8`     | Maximum redirects to follow. `0` disables following.                                                                      |
-| `download_file`       | `String`            | `""`    | Path to stream the body to on disk. Empty keeps the body in memory.                                                       |
-| `tls_options`         | `TLSOptions`        | `null`  | `null` uses `TLSOptions.client()`. Override for self-signed certificates.                                                 |
-| `proxy_host`          | `String`            | `""`    | Route http/https requests through a proxy host. Empty = direct connection.                                                |
-| `proxy_port`          | `int`               | `-1`    | Port of `proxy_host`. Ignored when `proxy_host` is empty.                                                                 |
-| `cancellation_token`  | `CancellationToken` | `null`  | Token for cancelling the request. `null` disables cancellation support.                                                   |
-| `on_event`            | `Callable`          | empty   | When set, parse a 2xx body as an SSE stream and invoke this per event. See [Server-Sent Events](#server-sent-events-sse). |
-| `on_progress`         | `Callable`          | empty   | When set, invoke `(bytes_received, total_bytes)` per chunk as the body downloads. See [Download progress](#download-progress).                  |
-| `on_status_changed`   | `Callable`          | empty   | When set, invoke `(status)` each time the `HTTPClient` status changes. See [Connection status](#connection-status).                            |
+| Property              | Type                | Default | Description                                                                                                                    |
+| --------------------- | ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `timeout`             | `float`             | `0.0`   | Maximum seconds to wait. `0.0` disables the timeout.                                                                           |
+| `body_size_limit`     | `int`               | `-1`    | Maximum response body size in bytes. `-1` is unlimited.                                                                        |
+| `download_chunk_size` | `int`               | `65536` | Read buffer size in bytes.                                                                                                     |
+| `accept_gzip`         | `bool`              | `true`  | Inject `Accept-Encoding: gzip, deflate` and auto-decompress.                                                                   |
+| `max_redirects`       | `int`               | `8`     | Maximum redirects to follow. `0` disables following.                                                                           |
+| `download_file`       | `String`            | `""`    | Path to stream the body to on disk. Empty keeps the body in memory.                                                            |
+| `tls_options`         | `TLSOptions`        | `null`  | `null` uses `TLSOptions.client()`. Override for self-signed certificates.                                                      |
+| `proxy_host`          | `String`            | `""`    | Route http/https requests through a proxy host. Empty = direct connection.                                                     |
+| `proxy_port`          | `int`               | `-1`    | Port of `proxy_host`. Ignored when `proxy_host` is empty.                                                                      |
+| `cancellation_token`  | `CancellationToken` | `null`  | Token for cancelling the request. `null` disables cancellation support.                                                        |
+| `on_event`            | `Callable`          | empty   | When set, parse a 2xx body as an SSE stream and invoke this per event. See [Server-Sent Events](#server-sent-events-sse).      |
+| `on_progress`         | `Callable`          | empty   | When set, invoke `(bytes_received, total_bytes)` per chunk as the body downloads. See [Download progress](#download-progress). |
+| `on_status_changed`   | `Callable`          | empty   | When set, invoke `(status)` each time the `HTTPClient` status changes. See [Connection status](#connection-status).            |
 
 ## Error handling
 
