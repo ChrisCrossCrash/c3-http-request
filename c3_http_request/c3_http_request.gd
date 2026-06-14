@@ -307,7 +307,9 @@ class _Impl:
 			var location := _header_value(resp_headers, "Location")
 			if not location.is_empty():
 				return await execute(
-					location, custom_headers, method, request_data,
+					location, custom_headers,
+					_redirect_method(method, status),
+					_redirect_body(method, status, request_data),
 					options, redirects_left - 1
 				)
 
@@ -370,6 +372,19 @@ class _Impl:
 			if header.to_lower().begins_with(prefix):
 				return header.substr(prefix.length()).strip_edges()
 		return ""
+
+	# RFC 9110 §15.4: 303 always redirects as GET (any original method); 301/302
+	# historically switch POST to GET but preserve other methods (§15.4.2–15.4.3).
+	# 307/308 explicitly require preserving the original method and body (§15.4.8–15.4.9).
+	func _redirect_method(method: int, status: int) -> int:
+		if status == 303 or (status in [301, 302] and method == HTTPClient.METHOD_POST):
+			return HTTPClient.METHOD_GET
+		return method
+
+	func _redirect_body(method: int, status: int, request_data: String) -> String:
+		if status == 303 or (status in [301, 302] and method == HTTPClient.METHOD_POST):
+			return ""
+		return request_data
 
 	func _fail(error: C3HTTPRequest.RequestError) -> C3HTTPRequest.Response:
 		var res := C3HTTPRequest.Response.new()

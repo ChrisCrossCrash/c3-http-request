@@ -252,6 +252,58 @@ class TestCancellationToken extends GutTest:
 		assert_string_contains(str(res.error), "[cancelled]")
 
 
+## Unit tests for redirect method and body downgrade logic.
+class TestRedirectSemantics extends GutTest:
+	var impl: C3HTTPRequest._Impl
+
+	func before_each() -> void:
+		impl = C3HTTPRequest._Impl.new()
+
+	# _redirect_method
+	func test_301_post_becomes_get() -> void:
+		assert_eq(impl._redirect_method(HTTPClient.METHOD_POST, 301), HTTPClient.METHOD_GET)
+
+	func test_302_post_becomes_get() -> void:
+		assert_eq(impl._redirect_method(HTTPClient.METHOD_POST, 302), HTTPClient.METHOD_GET)
+
+	func test_303_post_becomes_get() -> void:
+		assert_eq(impl._redirect_method(HTTPClient.METHOD_POST, 303), HTTPClient.METHOD_GET)
+
+	func test_303_put_becomes_get() -> void:
+		assert_eq(impl._redirect_method(HTTPClient.METHOD_PUT, 303), HTTPClient.METHOD_GET)
+
+	func test_301_get_stays_get() -> void:
+		assert_eq(impl._redirect_method(HTTPClient.METHOD_GET, 301), HTTPClient.METHOD_GET)
+
+	func test_301_put_stays_put() -> void:
+		assert_eq(impl._redirect_method(HTTPClient.METHOD_PUT, 301), HTTPClient.METHOD_PUT)
+
+	func test_307_post_stays_post() -> void:
+		assert_eq(impl._redirect_method(HTTPClient.METHOD_POST, 307), HTTPClient.METHOD_POST)
+
+	func test_308_post_stays_post() -> void:
+		assert_eq(impl._redirect_method(HTTPClient.METHOD_POST, 308), HTTPClient.METHOD_POST)
+
+	# _redirect_body
+	func test_301_post_drops_body() -> void:
+		assert_eq(impl._redirect_body(HTTPClient.METHOD_POST, 301, "data"), "")
+
+	func test_302_post_drops_body() -> void:
+		assert_eq(impl._redirect_body(HTTPClient.METHOD_POST, 302, "data"), "")
+
+	func test_303_drops_body_regardless_of_method() -> void:
+		assert_eq(impl._redirect_body(HTTPClient.METHOD_PUT, 303, "data"), "")
+
+	func test_307_post_preserves_body() -> void:
+		assert_eq(impl._redirect_body(HTTPClient.METHOD_POST, 307, "data"), "data")
+
+	func test_308_post_preserves_body() -> void:
+		assert_eq(impl._redirect_body(HTTPClient.METHOD_POST, 308, "data"), "data")
+
+	func test_301_put_preserves_body() -> void:
+		assert_eq(impl._redirect_body(HTTPClient.METHOD_PUT, 301, "data"), "data")
+
+
 ## Unit tests for the internal URL parser.
 class TestParseUrl extends GutTest:
 	var impl: C3HTTPRequest._Impl
