@@ -157,6 +157,20 @@ class TestRequest extends GutTest:
 		var forwarded: C3HTTPRequest.Options = impl.call_log[0]["options"]
 		assert_eq(forwarded.on_progress, sink)
 
+	func test_on_status_changed_forwarded_to_impl() -> void:
+		var sink := func(_status: HTTPClient.Status) -> void: pass
+		var opts := C3HTTPRequest.Options.new()
+		opts.on_status_changed = sink
+		await C3HTTPRequest.request(
+			"https://example.com",
+			PackedStringArray(),
+			C3HTTPRequest.Method.GET,
+			"",
+			opts
+		)
+		var forwarded: C3HTTPRequest.Options = impl.call_log[0]["options"]
+		assert_eq(forwarded.on_status_changed, sink)
+
 	func test_2xx_response_is_ok() -> void:
 		impl.preset.ok = true
 		impl.preset.status = 200
@@ -334,6 +348,9 @@ class TestOptions extends GutTest:
 
 	func test_default_on_progress_is_invalid() -> void:
 		assert_false(C3HTTPRequest.Options.new().on_progress.is_valid())
+
+	func test_default_on_status_changed_is_invalid() -> void:
+		assert_false(C3HTTPRequest.Options.new().on_status_changed.is_valid())
 
 
 ## Tests for [C3HTTPRequest.CancellationToken] and cancellation behavior.

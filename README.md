@@ -19,6 +19,7 @@ else:
 - Cancellation token — cancel an in-flight request from another coroutine or signal handler
 - Server-Sent Events (SSE) — pass an `on_event` callback to consume a streaming `text/event-stream` response incrementally
 - Download progress — pass an `on_progress` callback to track `(bytes_received, total_bytes)` as the body arrives
+- Connection status — pass an `on_status_changed` callback to observe the `HTTPClient` lifecycle (resolving, connecting, requesting, body)
 - Automatic gzip/deflate decompression when the server sends compressed responses
 - Redirect following with a configurable depth limit
 
@@ -44,6 +45,7 @@ else:
 | Raw request body (bytes)                |       ✓       |            ✓            |
 | HTTP/HTTPS proxy                        |       ✓       |            ✓            |
 | Download progress events                |       ✓       |            ✓            |
+| Connection status callback              |       ✓       |   ✓ `get_http_client_status()`   |
 | Threaded requests (off main loop)       |       —       |            ✓            |
 
 <sub>\* When `Options.download_file` is set, the response body is written to disk as-is — decompression is skipped and the file may contain raw compressed bytes.</sub>
@@ -120,6 +122,7 @@ var res3 := await C3HTTPRequest.request(url, PackedStringArray(), C3HTTPRequest.
 | `cancellation_token`  | `CancellationToken` | `null`  | Token for cancelling the request. `null` disables cancellation support.                                                   |
 | `on_event`            | `Callable`          | empty   | When set, parse a 2xx body as an SSE stream and invoke this per event. See [Server-Sent Events](#server-sent-events-sse). |
 | `on_progress`         | `Callable`          | empty   | When set, invoke `(bytes_received, total_bytes)` per chunk as the body downloads. See [Download progress](#download-progress).                  |
+| `on_status_changed`   | `Callable`          | empty   | When set, invoke `(status)` each time the `HTTPClient` status changes. See [Connection status](#connection-status).                            |
 
 ## Error handling
 
@@ -192,3 +195,22 @@ var res := await C3HTTPRequest.request("https://example.com/large.bin", PackedSt
 ```
 
 Works for both in-memory and `download_file` downloads. `bytes_received` counts raw bytes off the wire, so it may differ from the final `res.body.size()` when a gzip/deflate body is decompressed after the transfer completes. It has no effect in SSE mode (`on_event`), where the events themselves are the incremental signal.
+
+## Connection status
+
+Set `Options.on_status_changed` to a `Callable` to observe the underlying `HTTPClient` as it advances through its lifecycle — the equivalent of polling the native node's `get_http_client_status()`. The callback fires once per change, `on_status_changed.call(status)`, where `status` is an `HTTPClient.Status` value.
+
+```gdscript
+var opts := C3HTTPRequest.Options.new()
+opts.on_status_changed = func(status: HTTPClient.Status) -> void:
+    print(status)  # HTTPClient.STATUS_CONNECTING, STATUS_REQUESTING, STATUS_BODY, ...
+
+var res := await C3HTTPRequest.request("https://example.com", PackedStringArray(), C3HTTPRequest.Method.GET, "", opts)
+```
+
+A typical request reports `STATUS_RESOLVING`/`STATUS_CONNECTING` → `STATUS_CONNECTED` → `STATUS_REQUESTING` → `STATUS_BODY`. Notes:
+
+- **Observational only** — the request's outcome still arrives via the returned `Response`; this callback never changes it.
+- **Fires in every mode**, including `download_file` and SSE (`on_event`), since it tracks the connection, not the body.
+- **Repeats per redirect hop** — each hop opens a fresh connection, so the connect → request → body sequence is emitted again for every hop followed.
+- **Best-effort** — a very brief intermediate state may be coalesced, since the status is sampled once per poll.

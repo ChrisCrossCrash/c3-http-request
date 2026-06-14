@@ -9,6 +9,7 @@ func _ready() -> void:
 	await demo_body_size_limit()
 	await demo_download_file()
 	await demo_progress()
+	await demo_status()
 	await demo_cancellation()
 	await demo_sse()
 	print("\nDone.")
@@ -141,6 +142,25 @@ func demo_progress() -> void:
 	print("downloaded: ", res.body.size(), " bytes")
 
 
+func demo_status() -> void:
+	print("\n--- Connection status ---")
+	# on_status_changed fires as the underlying HTTPClient advances through its
+	# lifecycle — resolving, connecting, requesting, then reading the body. It is
+	# observational only; the request's outcome still arrives via the Response.
+	var opts := C3HTTPRequest.Options.new()
+	opts.on_status_changed = func(status: HTTPClient.Status) -> void:
+		print("status: ", _status_name(status))
+	var res := await C3HTTPRequest.request(
+		"https://jsonplaceholder.typicode.com/todos/1",
+		PackedStringArray(),
+		C3HTTPRequest.Method.GET,
+		"",
+		opts
+	)
+	print("ok:     ", res.ok)
+	print("status: ", res.status)
+
+
 func demo_cancellation() -> void:
 	print("\n--- Cancellation ---")
 	var token := C3HTTPRequest.CancellationToken.new()
@@ -196,6 +216,21 @@ func demo_sse() -> void:
 	print("received: ", counter[0], " events")
 	print("ended ok: ", res.ok)
 	print("error:    ", str(res.error))
+
+
+func _status_name(status: HTTPClient.Status) -> String:
+	match status:
+		HTTPClient.STATUS_DISCONNECTED: return "DISCONNECTED"
+		HTTPClient.STATUS_RESOLVING: return "RESOLVING"
+		HTTPClient.STATUS_CANT_RESOLVE: return "CANT_RESOLVE"
+		HTTPClient.STATUS_CONNECTING: return "CONNECTING"
+		HTTPClient.STATUS_CANT_CONNECT: return "CANT_CONNECT"
+		HTTPClient.STATUS_CONNECTED: return "CONNECTED"
+		HTTPClient.STATUS_REQUESTING: return "REQUESTING"
+		HTTPClient.STATUS_BODY: return "BODY"
+		HTTPClient.STATUS_CONNECTION_ERROR: return "CONNECTION_ERROR"
+		HTTPClient.STATUS_TLS_HANDSHAKE_ERROR: return "TLS_HANDSHAKE_ERROR"
+	return "UNKNOWN(%d)" % status
 
 
 func _header_value(headers: PackedStringArray, header_name: String) -> String:

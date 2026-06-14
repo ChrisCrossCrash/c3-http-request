@@ -118,6 +118,15 @@ class Options:
 	## Has no effect in SSE mode (see [member on_event]), where [member on_event]
 	## is the incremental signal instead.
 	var on_progress: Callable = Callable()
+	## Optional [Callable] invoked as the underlying connection advances, as
+	## [code]on_status_changed.call(status: HTTPClient.Status)[/code] — one of
+	## [code]STATUS_RESOLVING[/code], [code]STATUS_CONNECTING[/code],
+	## [code]STATUS_CONNECTED[/code], [code]STATUS_REQUESTING[/code],
+	## [code]STATUS_BODY[/code], etc. Fires once per change, in every mode
+	## (including SSE), and repeats the cycle for each hop when redirects are
+	## followed. Purely observational: the request's outcome is still reported via
+	## the returned [Response]. Very brief intermediate states may be coalesced.
+	var on_status_changed: Callable = Callable()
 
 
 ## The response returned by [method C3HTTPRequest.request].
@@ -290,9 +299,11 @@ class _Impl:
 
 		var tree := Engine.get_main_loop() as SceneTree
 		var start_ms := Time.get_ticks_msec()
+		var last_status := HTTPClient.STATUS_DISCONNECTED
 
 		while true:
 			client.poll()
+			last_status = _emit_status_change(client, last_status, options)
 			if client.get_status() not in [
 				HTTPClient.STATUS_CONNECTING, HTTPClient.STATUS_RESOLVING
 			]:
@@ -327,6 +338,7 @@ class _Impl:
 
 		while true:
 			client.poll()
+			last_status = _emit_status_change(client, last_status, options)
 			if client.get_status() != HTTPClient.STATUS_REQUESTING:
 				break
 			if _timed_out(start_ms, options.timeout):
@@ -373,6 +385,7 @@ class _Impl:
 					"Request was cancelled."
 				))
 			client.poll()
+			last_status = _emit_status_change(client, last_status, options)
 			var chunk: PackedByteArray = client.read_response_body_chunk()
 			if chunk.is_empty():
 				await tree.process_frame
@@ -521,6 +534,18 @@ class _Impl:
 			options.cancellation_token != null
 			and options.cancellation_token.is_cancelled()
 		)
+
+	# Emits on_status_changed when the client's status differs from last_status,
+	# returning the current status to carry forward to the next poll.
+	func _emit_status_change(
+		client: HTTPClient,
+		last_status: HTTPClient.Status,
+		options: C3HTTPRequest.Options
+	) -> HTTPClient.Status:
+		var current := client.get_status()
+		if current != last_status and options.on_status_changed.is_valid():
+			options.on_status_changed.call(current)
+		return current
 
 	func _header_value(headers: PackedStringArray, name: String) -> String:
 		var prefix := name.to_lower() + ": "
