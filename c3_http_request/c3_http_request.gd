@@ -307,7 +307,10 @@ class _Impl:
 			var location := _header_value(resp_headers, "Location")
 			if not location.is_empty():
 				return await execute(
-					location, custom_headers,
+					_resolve_redirect_url(
+						location, parsed["host"], parsed["port"], parsed["tls"], parsed["path"]
+					),
+					custom_headers,
 					_redirect_method(method, status),
 					_redirect_body(method, status, request_data),
 					options, redirects_left - 1
@@ -375,6 +378,33 @@ class _Impl:
 			if header.to_lower().begins_with(prefix):
 				return header.substr(prefix.length()).strip_edges()
 		return ""
+
+	# Resolves a Location header value against the original request per RFC 3986 §5.2.
+	func _resolve_redirect_url(
+		location: String, host: String, port: int, tls: bool, base_path: String
+	) -> String:
+		if location.begins_with("http://") or location.begins_with("https://"):
+			return location
+		var scheme := "https" if tls else "http"
+		var default_port := 443 if tls else 80
+		var authority := host if port == default_port else "%s:%d" % [host, port]
+		if location.begins_with("//"):
+			return scheme + ":" + location
+		if location.begins_with("/"):
+			return scheme + "://" + authority + _normalize_path(location)
+		var slash := base_path.rfind("/")
+		return scheme + "://" + authority + _normalize_path(base_path.substr(0, slash + 1) + location)
+
+	# Removes . and .. segments from an absolute path per RFC 3986 §5.2.4.
+	func _normalize_path(path: String) -> String:
+		var out: Array[String] = []
+		for seg: String in path.split("/"):
+			if seg == "..":
+				if out.size() > 1:
+					out.pop_back()
+			elif seg != ".":
+				out.append(seg)
+		return "/".join(out)
 
 	# RFC 9110 §15.4: 303 always redirects as GET (any original method); 301/302
 	# historically switch POST to GET but preserve other methods (§15.4.2–15.4.3).

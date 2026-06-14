@@ -304,6 +304,74 @@ class TestRedirectSemantics extends GutTest:
 		assert_eq(impl._redirect_body(HTTPClient.METHOD_PUT, 301, "data"), "data")
 
 
+## Unit tests for redirect URL resolution.
+class TestResolveRedirectUrl extends GutTest:
+	var impl: C3HTTPRequest._Impl
+
+	func before_each() -> void:
+		impl = C3HTTPRequest._Impl.new()
+
+	func test_absolute_https_returned_as_is() -> void:
+		assert_eq(
+			impl._resolve_redirect_url("https://other.com/path", "host.com", 443, true, "/old"),
+			"https://other.com/path"
+		)
+
+	func test_absolute_http_returned_as_is() -> void:
+		assert_eq(
+			impl._resolve_redirect_url("http://other.com/path", "host.com", 80, false, "/old"),
+			"http://other.com/path"
+		)
+
+	func test_protocol_relative_prepends_https() -> void:
+		assert_eq(
+			impl._resolve_redirect_url("//other.com/path", "host.com", 443, true, "/old"),
+			"https://other.com/path"
+		)
+
+	func test_protocol_relative_prepends_http() -> void:
+		assert_eq(
+			impl._resolve_redirect_url("//other.com/path", "host.com", 80, false, "/old"),
+			"http://other.com/path"
+		)
+
+	func test_absolute_path_on_default_port() -> void:
+		assert_eq(
+			impl._resolve_redirect_url("/new", "host.com", 443, true, "/old"),
+			"https://host.com/new"
+		)
+
+	func test_absolute_path_on_explicit_port() -> void:
+		assert_eq(
+			impl._resolve_redirect_url("/new", "localhost", 8080, false, "/old"),
+			"http://localhost:8080/new"
+		)
+
+	func test_relative_path_resolved_against_base_dir() -> void:
+		assert_eq(
+			impl._resolve_redirect_url("page", "host.com", 443, true, "/api/v1/"),
+			"https://host.com/api/v1/page"
+		)
+
+	func test_relative_path_with_dot_dot() -> void:
+		assert_eq(
+			impl._resolve_redirect_url("../v2/users", "host.com", 443, true, "/api/v1/users"),
+			"https://host.com/api/v2/users"
+		)
+
+	func test_dot_segment_in_absolute_path() -> void:
+		assert_eq(
+			impl._resolve_redirect_url("/a/b/../c", "host.com", 443, true, "/old"),
+			"https://host.com/a/c"
+		)
+
+	func test_dot_dot_cannot_escape_root() -> void:
+		assert_eq(
+			impl._resolve_redirect_url("/../c", "host.com", 443, true, "/old"),
+			"https://host.com/c"
+		)
+
+
 ## Unit tests for the internal URL parser.
 class TestParseUrl extends GutTest:
 	var impl: C3HTTPRequest._Impl
