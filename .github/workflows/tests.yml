@@ -1,0 +1,30 @@
+name: tests
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        godot-version: [4.6.2-stable]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup Godot
+        uses: lihop/setup-godot@v3
+        with:
+          version: ${{ matrix.godot-version }}
+
+      - name: Import project
+        run: godot --headless --path . --import
+
+      - name: Run GUT
+        run: |
+          godot --headless --path . -s addons/gut/gut_cmdln.gd \
+            -gdir=res://tests -ginclude_subdirs -gexit

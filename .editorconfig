@@ -1,0 +1,11 @@
+root = true
+
+[*]
+charset = utf-8
+
+[*.gd]
+indent_style = tab
+
+[*.md]
+indent_style = space
+indent_size = 4

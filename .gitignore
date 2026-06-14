@@ -1,0 +1,26 @@
+# Godot
+.import/
+.godot/
+/android/
+
+# Builds
+/build/
+
+# Godot C#
+.mono/
+
+# Blender backup files
+*.blend1
+*.blend2
+*.blend@
+
+# Temporary files
+*.tmp
+*.temp
+
+# Editor backup files
+*~
+
+# OS junk
+.DS_Store
+Thumbs.db

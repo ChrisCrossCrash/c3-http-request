@@ -1,0 +1,12 @@
+{
+  "files.exclude": {
+    "**/*.uid": true,
+    "**/*.tmp": true,
+  },
+  "search.exclude": {
+    "**/*.uid": true,
+    "addons/**": true,
+    "**/*.tmp": true,
+    "**/*.import": true
+  }
+}
