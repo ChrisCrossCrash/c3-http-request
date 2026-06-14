@@ -42,6 +42,26 @@ static func request(
 	)
 
 
+## Sends an HTTP request with a raw byte-array body, like [method request] but
+## the body is sent as-is without UTF-8 encoding. Use for binary payloads
+## (encoded files, serialized data, custom binary protocols). [br]
+## [param request_data_raw] is the raw request body bytes. [br]
+## [param method] defaults to [code]POST[/code]; a raw body is ignored on
+## [code]GET[/code]. [br]
+## See [method request] for the remaining parameters.
+static func request_raw(
+	url: String,
+	custom_headers: PackedStringArray = PackedStringArray(),
+	method: Method = Method.POST,
+	request_data_raw: PackedByteArray = PackedByteArray(),
+	options: Options = null
+) -> Response:
+	var opts: Options = options if options != null else Options.new()
+	return await _impl.execute(
+		url, custom_headers, _METHOD_MAP[method], request_data_raw, opts
+	)
+
+
 ## Per-request configuration. Defaults match [HTTPRequest] node defaults.
 class Options:
 	## Maximum seconds to wait for a response. [code]0.0[/code] disables the timeout.
@@ -186,7 +206,7 @@ class _Impl:
 		url: String,
 		custom_headers: PackedStringArray,
 		method: int,
-		request_data: String,
+		request_data: Variant,
 		options: C3HTTPRequest.Options,
 		_redirects_left: int = -1
 	) -> C3HTTPRequest.Response:
@@ -257,7 +277,14 @@ class _Impl:
 				"Could not connect (status %d)." % client.get_status()
 			))
 
-		err = client.request(method, parsed["path"], all_headers, request_data)
+		if request_data is PackedByteArray:
+			err = client.request_raw(
+				method, parsed["path"], all_headers, request_data
+			)
+		else:
+			err = client.request(
+				method, parsed["path"], all_headers, request_data
+			)
 		if err != OK:
 			return _fail(C3HTTPRequest.RequestError.transport(
 				"Failed to send request (error %d)." % err
@@ -475,8 +502,8 @@ class _Impl:
 		return method
 
 	func _redirect_body(
-		method: int, status: int, request_data: String
-	) -> String:
+		method: int, status: int, request_data: Variant
+	) -> Variant:
 		if (
 			status == 303
 			or (status in [301, 302] and method == HTTPClient.METHOD_POST)

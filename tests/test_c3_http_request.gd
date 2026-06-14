@@ -11,7 +11,7 @@ class TestableImpl extends C3HTTPRequest._Impl:
 		url: String,
 		custom_headers: PackedStringArray,
 		method: int,
-		request_data: String,
+		request_data: Variant,
 		options: C3HTTPRequest.Options,
 		_redirects_left: int = -1
 	) -> C3HTTPRequest.Response:
@@ -77,6 +77,50 @@ class TestRequest extends GutTest:
 			"hello"
 		)
 		assert_eq(impl.call_log[0]["request_data"], "hello")
+
+	func test_request_raw_data_forwarded() -> void:
+		var body := PackedByteArray([0, 1, 2, 255])
+		await C3HTTPRequest.request_raw(
+			"https://example.com",
+			PackedStringArray(),
+			C3HTTPRequest.Method.POST,
+			body
+		)
+		assert_eq(impl.call_log[0]["request_data"], body)
+
+	func test_request_raw_default_method_is_post() -> void:
+		await C3HTTPRequest.request_raw("https://example.com")
+		assert_eq(impl.call_log[0]["method"], HTTPClient.METHOD_POST)
+
+	func test_request_raw_method_forwarded() -> void:
+		await C3HTTPRequest.request_raw(
+			"https://example.com",
+			PackedStringArray(),
+			C3HTTPRequest.Method.PUT,
+			PackedByteArray([1, 2, 3])
+		)
+		assert_eq(impl.call_log[0]["method"], HTTPClient.METHOD_PUT)
+
+	func test_request_raw_headers_forwarded() -> void:
+		await C3HTTPRequest.request_raw(
+			"https://example.com", PackedStringArray(["X-Custom: value"])
+		)
+		assert_eq(
+			impl.call_log[0]["custom_headers"],
+			PackedStringArray(["X-Custom: value"])
+		)
+
+	func test_request_raw_options_forwarded() -> void:
+		var opts := C3HTTPRequest.Options.new()
+		opts.timeout = 5.0
+		await C3HTTPRequest.request_raw(
+			"https://example.com",
+			PackedStringArray(),
+			C3HTTPRequest.Method.POST,
+			PackedByteArray(),
+			opts
+		)
+		assert_eq(impl.call_log[0]["options"], opts)
 
 	func test_null_options_uses_defaults() -> void:
 		await C3HTTPRequest.request("https://example.com")
@@ -391,6 +435,30 @@ class TestRedirectSemantics extends GutTest:
 	func test_301_put_preserves_body() -> void:
 		assert_eq(
 			impl._redirect_body(HTTPClient.METHOD_PUT, 301, "data"), "data"
+		)
+
+	func test_307_post_preserves_raw_body() -> void:
+		var body := PackedByteArray([1, 2, 3])
+		assert_eq(impl._redirect_body(HTTPClient.METHOD_POST, 307, body), body)
+
+	func test_308_put_preserves_raw_body() -> void:
+		var body := PackedByteArray([4, 5, 6])
+		assert_eq(impl._redirect_body(HTTPClient.METHOD_PUT, 308, body), body)
+
+	func test_303_drops_raw_body() -> void:
+		assert_eq(
+			impl._redirect_body(
+				HTTPClient.METHOD_POST, 303, PackedByteArray([1, 2, 3])
+			),
+			""
+		)
+
+	func test_302_post_drops_raw_body() -> void:
+		assert_eq(
+			impl._redirect_body(
+				HTTPClient.METHOD_POST, 302, PackedByteArray([1, 2, 3])
+			),
+			""
 		)
 
 

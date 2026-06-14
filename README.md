@@ -15,6 +15,7 @@ else:
 - Static `await`-able `request()` callable from any script — no `Node` to add or configure
 - Every call returns a typed `Response` object — a single `if not res.ok` check covers transport failures, timeouts, and non-2xx statuses alike
 - Per-request `Options`: timeout, body size limit, gzip decompression, redirect control, custom TLS, and download-to-file
+- `request_raw()` companion for sending a raw `PackedByteArray` body (binary payloads) unencoded
 - Cancellation token — cancel an in-flight request from another coroutine or signal handler
 - Automatic gzip/deflate decompression when the server sends compressed responses
 - Redirect following with a configurable depth limit
@@ -37,7 +38,7 @@ else:
 | Body size limit                         |       ✓       |            ✓            |
 | Custom TLS options                      |       ✓       |            ✓            |
 | Binary response body in memory          |       ✓       |            ✓            |
-| Raw request body (bytes)                |       —       |            ✓            |
+| Raw request body (bytes)                |       ✓       |            ✓            |
 | HTTP/HTTPS proxy                        |       —       |            ✓            |
 | Download progress events                |       —       |            ✓            |
 | Threaded requests (off main loop)       |       —       |            ✓            |
@@ -73,6 +74,14 @@ var res2 := await C3HTTPRequest.request(
     ]),
     C3HTTPRequest.Method.POST,
     '{"title": "hello"}'
+)
+
+# POST a raw binary body (sent as-is, not UTF-8 encoded)
+var res_raw := await C3HTTPRequest.request_raw(
+    "https://api.example.com/upload",
+    PackedStringArray(["Content-Type: application/octet-stream"]),
+    C3HTTPRequest.Method.POST,
+    payload  # a PackedByteArray
 )
 
 # Per-request options
