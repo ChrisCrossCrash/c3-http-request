@@ -107,9 +107,15 @@ class TestRequest extends GutTest:
 
 	func test_body_on_success() -> void:
 		impl.preset.ok = true
-		impl.preset.body = "hello"
+		impl.preset.body = "hello".to_utf8_buffer()
 		var res := await C3HTTPRequest.request("https://example.com")
-		assert_eq(res.body, "hello")
+		assert_eq(res.body, "hello".to_utf8_buffer())
+
+	func test_text_decodes_body() -> void:
+		impl.preset.ok = true
+		impl.preset.body = "hello".to_utf8_buffer()
+		var res := await C3HTTPRequest.request("https://example.com")
+		assert_eq(res.text, "hello")
 
 	func test_status_on_success() -> void:
 		impl.preset.ok = true
@@ -197,7 +203,10 @@ class TestResponse extends GutTest:
 		assert_eq(C3HTTPRequest.Response.new().headers, PackedStringArray())
 
 	func test_default_body() -> void:
-		assert_eq(C3HTTPRequest.Response.new().body, "")
+		assert_eq(C3HTTPRequest.Response.new().body, PackedByteArray())
+
+	func test_default_text() -> void:
+		assert_eq(C3HTTPRequest.Response.new().text, "")
 
 
 ## Tests for [C3HTTPRequest.Options] defaults.

@@ -24,7 +24,7 @@ func demo_get() -> void:
 		return
 	print("status:       ", res.status)
 	print("content-type: ", _header_value(res.headers, "Content-Type"))
-	print("body:         ", res.body)
+	print("body:         ", res.text)
 
 
 func demo_post() -> void:
@@ -39,7 +39,7 @@ func demo_post() -> void:
 		print("error: ", str(res.error))
 		return
 	print("status: ", res.status)
-	print("body:   ", res.body)
+	print("body:   ", res.text)
 
 
 func demo_not_found() -> void:
@@ -51,7 +51,7 @@ func demo_not_found() -> void:
 	print("ok:     ", res.ok)
 	print("status: ", res.status)
 	print("error:  ", str(res.error))
-	print("body:   ", res.body)
+	print("body:   ", res.text)
 
 
 func demo_timeout() -> void:

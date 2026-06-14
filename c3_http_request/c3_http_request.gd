@@ -82,9 +82,19 @@ class Response:
 	## Response headers as [code]"Name: Value"[/code] strings.
 	## Empty when no HTTP response was received.
 	var headers: PackedStringArray = PackedStringArray()
-	## Raw UTF-8 response body. Empty when [member Options.download_file] is set
-	## or when no body was received.
-	var body := ""
+	## Raw response body bytes. Empty when [member Options.download_file] is set
+	## or when no body was received. Use [member text] for a decoded string view.
+	var body: PackedByteArray = PackedByteArray()
+	## The response body decoded as UTF-8. Computed lazily on first access and
+	## cached, so binary responses never pay the decode cost. Returns
+	## [code]""[/code] for an empty or non-UTF-8 body.
+	var text: String:
+		get:
+			if _text_cache == null:
+				_text_cache = body.get_string_from_utf8()
+			return _text_cache
+
+	var _text_cache: Variant = null
 
 
 ## Structured error placed on [member Response.error] when
@@ -336,7 +346,7 @@ class _Impl:
 		var res := C3HTTPRequest.Response.new()
 		res.status = status
 		res.headers = resp_headers
-		res.body = body_bytes.get_string_from_utf8() if file == null else ""
+		res.body = body_bytes if file == null else PackedByteArray()
 		if status < 200 or status >= 300:
 			res.ok = false
 			var e := C3HTTPRequest.RequestError.new()
