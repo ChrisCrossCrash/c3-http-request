@@ -14,6 +14,7 @@ func _ready() -> void:
 	await demo_cancellation()
 	await demo_sse()
 	print("\nDone.")
+	await get_tree().process_frame # Let pending prints flush before quitting.
 	get_tree().quit()
 
 
