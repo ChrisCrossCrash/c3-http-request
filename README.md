@@ -122,6 +122,8 @@ When `res.ok` is `false`, `res.error` is a `RequestError` describing what went w
 
 ## Cancellation
 
+Pass a `CancellationToken` via `Options.cancellation_token` and call `token.cancel()` from anywhere; the polling loop checks the token between iterations and, once cancelled, abandons the request and returns a `Response` with `error.kind == CANCELLED`.
+
 ```gdscript
 var token := C3HTTPRequest.CancellationToken.new()
 var opts := C3HTTPRequest.Options.new()
