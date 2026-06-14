@@ -125,8 +125,8 @@ func demo_cancellation() -> void:
 	print("error: ", str(res.error))
 
 
-func _header_value(headers: PackedStringArray, name: String) -> String:
-	var prefix := name.to_lower() + ": "
+func _header_value(headers: PackedStringArray, header_name: String) -> String:
+	var prefix := header_name.to_lower() + ": "
 	for h: String in headers:
 		if h.to_lower().begins_with(prefix):
 			return h.substr(prefix.length()).strip_edges()
