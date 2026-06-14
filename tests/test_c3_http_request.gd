@@ -197,6 +197,21 @@ class TestRequestError extends GutTest:
 		var s := str(RequestError.body_size_limit_exceeded("Body too large."))
 		assert_string_contains(s, "[body_size_limit_exceeded]")
 
+	func test_to_string_cancelled() -> void:
+		var s := str(RequestError.cancelled("Cancelled."))
+		assert_string_contains(s, "[cancelled]")
+
+	func test_to_string_client() -> void:
+		var s := str(RequestError.client_error("Bad URL."))
+		assert_string_contains(s, "[client]")
+
+	func test_to_string_http() -> void:
+		var e := RequestError.new()
+		e.kind = RequestError.Kind.HTTP
+		e.status = 404
+		e.message = "Not found."
+		assert_string_contains(str(e), "[http]")
+
 
 ## Tests for [C3HTTPRequest.Response] defaults.
 class TestResponse extends GutTest:
@@ -217,6 +232,11 @@ class TestResponse extends GutTest:
 
 	func test_default_text() -> void:
 		assert_eq(C3HTTPRequest.Response.new().text, "")
+
+	func test_text_decodes_body() -> void:
+		var res := C3HTTPRequest.Response.new()
+		res.body = "😎".to_utf8_buffer()
+		assert_eq(res.text, "😎")
 
 
 ## Tests for [C3HTTPRequest.Options] defaults.
