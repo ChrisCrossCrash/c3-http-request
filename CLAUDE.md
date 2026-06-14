@@ -42,7 +42,7 @@ The addon is a single script: [c3_http_request/c3_http_request.gd](c3_http_reque
 **Inner classes:**
 
 - `Method` enum — `GET`, `HEAD`, `POST`, `PUT`, `DELETE`, `OPTIONS`, `PATCH`
-- `Options` — `timeout`, `body_size_limit`, `download_chunk_size`, `accept_gzip`, `max_redirects`, `download_file`, `tls_options`, `proxy_host`, `proxy_port`, `cancellation_token`, `on_event` (SSE streaming sink), `on_progress` (download progress sink), `on_status_changed` (HTTPClient status sink)
+- `Options` — `timeout`, `body_size_limit`, `download_chunk_size`, `accept_gzip`, `max_redirects`, `download_file`, `tls_options`, `proxy_host`, `proxy_port`, `cancellation_token`, `on_sse_event` (SSE streaming sink), `on_progress` (download progress sink), `on_status_changed` (HTTPClient status sink)
 - `Response` — `ok: bool`, `error: RequestError`, `status: int`, `headers: PackedStringArray`, `body: String`
 - `RequestError` — `Kind` enum (`TRANSPORT`, `HTTP`, `CLIENT`, `CANCELLED`, `TIMEOUT`), `kind`, `message`, `status`, factory methods, `_to_string()`
 - `CancellationToken` — `cancel()`, `is_cancelled()`

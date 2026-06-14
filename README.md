@@ -53,7 +53,7 @@ No node, no signal, no tree — and `res.ok` is a single check that already acco
 - Per-request `Options`: timeout, body size limit, gzip decompression, redirect control, custom TLS, proxy, and download-to-file
 - `request_raw()` companion for sending a raw `PackedByteArray` body (binary payloads) unencoded
 - Cancellation token — cancel an in-flight request from another coroutine or signal handler
-- Server-Sent Events (SSE) — pass an `on_event` callback to consume a streaming `text/event-stream` response incrementally
+- Server-Sent Events (SSE) — pass an `on_sse_event` callback to consume a streaming `text/event-stream` response incrementally
 - Download progress — pass an `on_progress` callback to track `(bytes_received, total_bytes)` as the body arrives
 - Connection status — pass an `on_status_changed` callback to observe the `HTTPClient` lifecycle (resolving, connecting, requesting, body)
 - Automatic gzip/deflate decompression when the server sends compressed responses
@@ -159,7 +159,7 @@ var res3 := await C3HTTPRequest.request(url, PackedStringArray(), C3HTTPRequest.
 | `proxy_host`          | `String`            | `""`    | Route http/https requests through a proxy host. Empty = direct connection.                                                     |
 | `proxy_port`          | `int`               | `-1`    | Port of `proxy_host`. Ignored when `proxy_host` is empty.                                                                      |
 | `cancellation_token`  | `CancellationToken` | `null`  | Token for cancelling the request. `null` disables cancellation support.                                                        |
-| `on_event`            | `Callable`          | empty   | When set, parse a 2xx body as an SSE stream and invoke this per event. See [Server-Sent Events](#server-sent-events-sse).      |
+| `on_sse_event`        | `Callable`          | empty   | When set, parse a 2xx body as an SSE stream and invoke this per event. See [Server-Sent Events](#server-sent-events-sse).      |
 | `on_progress`         | `Callable`          | empty   | When set, invoke `(bytes_received, total_bytes)` per chunk as the body downloads. See [Download progress](#download-progress). |
 | `on_status_changed`   | `Callable`          | empty   | When set, invoke `(status)` each time the `HTTPClient` status changes. See [Connection status](#connection-status).            |
 
@@ -197,11 +197,11 @@ if not res.ok and res.error.kind == C3HTTPRequest.RequestError.Kind.CANCELLED:
 
 ## Server-Sent Events (SSE)
 
-Set `Options.on_event` to a `Callable` to consume a streaming `text/event-stream` response. The callback fires once per event — `on_event.call(data, event_type)` — as events arrive, and the same `await` you already use resolves to a final `Response` once the stream closes. No new method, no `Node`, no signal wiring.
+Set `Options.on_sse_event` to a `Callable` to consume a streaming `text/event-stream` response. The callback fires once per event — `on_sse_event.call(data, event_type)` — as events arrive, and the same `await` you already use resolves to a final `Response` once the stream closes. No new method, no `Node`, no signal wiring.
 
 ```gdscript
 var opts := C3HTTPRequest.Options.new()
-opts.on_event = func(data: String, event_type: String) -> void:
+opts.on_sse_event = func(data: String, event_type: String) -> void:
     print("[%s] %s" % [event_type, data])
 
 var res := await C3HTTPRequest.request("https://api.example.com/stream", PackedStringArray(), C3HTTPRequest.Method.GET, "", opts)
@@ -233,7 +233,7 @@ opts.on_progress = func(bytes_received: int, total_bytes: int) -> void:
 var res := await C3HTTPRequest.request("https://example.com/large.bin", PackedStringArray(), C3HTTPRequest.Method.GET, "", opts)
 ```
 
-Works for both in-memory and `download_file` downloads. `bytes_received` counts raw bytes off the wire, so it may differ from the final `res.body.size()` when a gzip/deflate body is decompressed after the transfer completes. It has no effect in SSE mode (`on_event`), where the events themselves are the incremental signal.
+Works for both in-memory and `download_file` downloads. `bytes_received` counts raw bytes off the wire, so it may differ from the final `res.body.size()` when a gzip/deflate body is decompressed after the transfer completes. It has no effect in SSE mode (`on_sse_event`), where the events themselves are the incremental signal.
 
 ## Connection status
 
@@ -250,6 +250,6 @@ var res := await C3HTTPRequest.request("https://example.com", PackedStringArray(
 A typical request reports `STATUS_RESOLVING`/`STATUS_CONNECTING` → `STATUS_CONNECTED` → `STATUS_REQUESTING` → `STATUS_BODY`. Notes:
 
 - **Observational only** — the request's outcome still arrives via the returned `Response`; this callback never changes it.
-- **Fires in every mode**, including `download_file` and SSE (`on_event`), since it tracks the connection, not the body.
+- **Fires in every mode**, including `download_file` and SSE (`on_sse_event`), since it tracks the connection, not the body.
 - **Repeats per redirect hop** — each hop opens a fresh connection, so the connect → request → body sequence is emitted again for every hop followed.
 - **Best-effort** — a very brief intermediate state may be coalesced, since the status is sampled once per poll.

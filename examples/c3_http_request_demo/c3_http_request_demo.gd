@@ -208,7 +208,7 @@ func demo_cancellation() -> void:
 func demo_sse() -> void:
 	print("\n--- Server-Sent Events ---")
 	# Wikimedia EventStreams is a real, public, never-ending SSE feed of recent
-	# wiki edits (https://stream.wikimedia.org). Setting Options.on_event parses
+	# wiki edits (https://stream.wikimedia.org). Setting Options.on_sse_event parses
 	# the response as a stream and fires the callback per event; the await below
 	# resolves only once the stream closes. Since the feed never ends, we cancel
 	# the token from inside the callback after a few events — the same mechanism
@@ -219,7 +219,7 @@ func demo_sse() -> void:
 	# A single-element Array so the callback's mutation is visible out here:
 	# lambdas capture value types (like an int) by copy, but Array by reference.
 	var counter := [0]
-	opts.on_event = func(data: String, event_type: String) -> void:
+	opts.on_sse_event = func(data: String, event_type: String) -> void:
 		counter[0] += 1
 		var title := "?"
 		var parsed: Variant = JSON.parse_string(data)

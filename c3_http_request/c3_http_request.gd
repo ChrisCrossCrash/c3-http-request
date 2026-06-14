@@ -97,7 +97,7 @@ class Options:
 	var cancellation_token: CancellationToken = null
 	## Optional [Callable] invoked once per Server-Sent Event as the response
 	## streams in, as
-	## [code]on_event.call(data: String, event_type: String)[/code]. When set,
+	## [code]on_sse_event.call(data: String, event_type: String)[/code]. When set,
 	## a 2xx response body is parsed as an SSE stream rather than collected:
 	## [member Response.body] stays empty and [method C3HTTPRequest.request]
 	## resolves only when the stream closes (use [member cancellation_token] to
@@ -108,15 +108,15 @@ class Options:
 	## [member Response.error], and the error body still work as usual. Both LF
 	## ([code]\n\n[/code]) and CRLF ([code]\r\n\r\n[/code]) event delimiters are
 	## supported.
-	var on_event: Callable = Callable()
+	var on_sse_event: Callable = Callable()
 	## Optional [Callable] invoked as the response body downloads, as
 	## [code]on_progress.call(bytes_received: int, total_bytes: int)[/code].
 	## [code]bytes_received[/code] is the cumulative byte count;
 	## [code]total_bytes[/code] is the [code]Content-Length[/code], or
 	## [code]-1[/code] when unknown (e.g. a chunked response). Fires once per
 	## non-empty chunk for both in-memory and [member download_file] downloads.
-	## Has no effect in SSE mode (see [member on_event]), where [member on_event]
-	## is the incremental signal instead.
+	## Has no effect in SSE mode (see [member on_sse_event]), where
+	## [member on_sse_event] is the incremental signal instead.
 	var on_progress: Callable = Callable()
 	## Optional [Callable] invoked as the underlying connection advances, as
 	## [code]on_status_changed.call(status: HTTPClient.Status)[/code] — one of
@@ -281,8 +281,8 @@ class _Impl:
 		var redirects_left := (
 			options.max_redirects if _redirects_left < 0 else _redirects_left
 		)
-		# A valid on_event sink switches a 2xx body to incremental SSE parsing.
-		var streaming := options.on_event.is_valid()
+		# A valid on_sse_event sink switches a 2xx body to incremental SSE parsing.
+		var streaming := options.on_sse_event.is_valid()
 
 		var parsed := _parse_url(url)
 		if parsed.is_empty():
@@ -430,7 +430,7 @@ class _Impl:
 						% options.body_size_limit
 					))
 				sse_buffer.append_array(chunk)
-				sse_buffer = _drain_sse_buffer(sse_buffer, options.on_event)
+				sse_buffer = _drain_sse_buffer(sse_buffer, options.on_sse_event)
 				continue
 			if (
 				options.body_size_limit >= 0
@@ -458,7 +458,7 @@ class _Impl:
 		if sse_mode:
 			var tail := sse_buffer.get_string_from_utf8()
 			if not tail.strip_edges().is_empty():
-				_emit_sse_event(tail, options.on_event)
+				_emit_sse_event(tail, options.on_sse_event)
 
 		if options.accept_gzip and file == null and not body_bytes.is_empty():
 			var encoding := _header_value(resp_headers, "Content-Encoding").to_lower()

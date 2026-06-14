@@ -383,8 +383,8 @@ class TestOptions extends GutTest:
 	func test_default_cancellation_token() -> void:
 		assert_null(C3HTTPRequest.Options.new().cancellation_token)
 
-	func test_default_on_event_is_invalid() -> void:
-		assert_false(C3HTTPRequest.Options.new().on_event.is_valid())
+	func test_default_on_sse_event_is_invalid() -> void:
+		assert_false(C3HTTPRequest.Options.new().on_sse_event.is_valid())
 
 	func test_default_on_progress_is_invalid() -> void:
 		assert_false(C3HTTPRequest.Options.new().on_progress.is_valid())
