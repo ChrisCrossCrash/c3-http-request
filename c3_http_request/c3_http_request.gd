@@ -85,6 +85,13 @@ class Options:
 	## [method TLSOptions.client] (validates the server certificate). Override
 	## with [method TLSOptions.client_unsafe] for self-signed certificates.
 	var tls_options: TLSOptions = null
+	## Host of an HTTP/HTTPS proxy to route this request through. Empty means no
+	## proxy (a direct connection). Applies to both [code]http://[/code] and
+	## [code]https://[/code] requests.
+	var proxy_host: String = ""
+	## Port of the proxy named by [member proxy_host]. Ignored when
+	## [member proxy_host] is empty.
+	var proxy_port: int = -1
 	## Token for cancelling this request from another coroutine or signal
 	## handler. [code]null[/code] means no cancellation support.
 	var cancellation_token: CancellationToken = null
@@ -253,6 +260,9 @@ class _Impl:
 
 		var client := HTTPClient.new()
 		client.set_read_chunk_size(options.download_chunk_size)
+		if not options.proxy_host.is_empty():
+			client.set_http_proxy(options.proxy_host, options.proxy_port)
+			client.set_https_proxy(options.proxy_host, options.proxy_port)
 
 		var err: int
 		if parsed["tls"]:

@@ -306,6 +306,12 @@ class TestOptions extends GutTest:
 	func test_default_tls_options() -> void:
 		assert_null(C3HTTPRequest.Options.new().tls_options)
 
+	func test_default_proxy_host() -> void:
+		assert_eq(C3HTTPRequest.Options.new().proxy_host, "")
+
+	func test_default_proxy_port() -> void:
+		assert_eq(C3HTTPRequest.Options.new().proxy_port, -1)
+
 	func test_default_cancellation_token() -> void:
 		assert_null(C3HTTPRequest.Options.new().cancellation_token)
 

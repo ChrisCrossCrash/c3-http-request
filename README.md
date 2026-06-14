@@ -14,7 +14,7 @@ else:
 
 - Static `await`-able `request()` callable from any script — no `Node` to add or configure
 - Every call returns a typed `Response` object — a single `if not res.ok` check covers transport failures, timeouts, and non-2xx statuses alike
-- Per-request `Options`: timeout, body size limit, gzip decompression, redirect control, custom TLS, and download-to-file
+- Per-request `Options`: timeout, body size limit, gzip decompression, redirect control, custom TLS, proxy, and download-to-file
 - `request_raw()` companion for sending a raw `PackedByteArray` body (binary payloads) unencoded
 - Cancellation token — cancel an in-flight request from another coroutine or signal handler
 - Server-Sent Events (SSE) — pass an `on_event` callback to consume a streaming `text/event-stream` response incrementally
@@ -41,7 +41,7 @@ else:
 | Custom TLS options                      |       ✓       |            ✓            |
 | Binary response body in memory          |       ✓       |            ✓            |
 | Raw request body (bytes)                |       ✓       |            ✓            |
-| HTTP/HTTPS proxy                        |       —       |            ✓            |
+| HTTP/HTTPS proxy                        |       ✓       |            ✓            |
 | Download progress events                |       —       |            ✓            |
 | Threaded requests (off main loop)       |       —       |            ✓            |
 
@@ -114,6 +114,8 @@ var res3 := await C3HTTPRequest.request(url, PackedStringArray(), C3HTTPRequest.
 | `max_redirects`       | `int`               | `8`     | Maximum redirects to follow. `0` disables following.                                                                      |
 | `download_file`       | `String`            | `""`    | Path to stream the body to on disk. Empty keeps the body in memory.                                                       |
 | `tls_options`         | `TLSOptions`        | `null`  | `null` uses `TLSOptions.client()`. Override for self-signed certificates.                                                 |
+| `proxy_host`          | `String`            | `""`    | Route http/https requests through a proxy host. Empty = direct connection.                                                |
+| `proxy_port`          | `int`               | `-1`    | Port of `proxy_host`. Ignored when `proxy_host` is empty.                                                                 |
 | `cancellation_token`  | `CancellationToken` | `null`  | Token for cancelling the request. `null` disables cancellation support.                                                   |
 | `on_event`            | `Callable`          | empty   | When set, parse a 2xx body as an SSE stream and invoke this per event. See [Server-Sent Events](#server-sent-events-sse). |
 
