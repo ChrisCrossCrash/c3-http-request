@@ -89,7 +89,7 @@ No node, no signal, no tree — and `res.ok` is a single check that already acco
 
 ## Compatibility
 
-Tested on Godot 4.6.x with automated ([GUT](https://github.com/bitwes/Gut)) tests.
+Tested on Godot 4.6.x with automated ([GUT](https://github.com/bitwes/Gut)) and manual tests. Manually verified to work back to Godot 4.2.0.
 
 ## Installation
 
