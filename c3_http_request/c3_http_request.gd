@@ -380,12 +380,23 @@ class _Impl:
 			path = path.substr(0, fragment)
 		var port := 443 if scheme == "https" else 80
 		var host := host_part
-		var colon := host_part.find(":")
-		if colon != -1:
-			var port_str := host_part.substr(colon + 1)
-			if port_str.is_valid_int():
-				port = port_str.to_int()
-			host = host_part.substr(0, colon)
+		if host_part.begins_with("["):
+			var bracket_close := host_part.find("]")
+			if bracket_close == -1:
+				return {}
+			host = host_part.substr(1, bracket_close - 1)
+			var after_bracket := host_part.substr(bracket_close + 1)
+			if after_bracket.begins_with(":"):
+				var port_str := after_bracket.substr(1)
+				if port_str.is_valid_int():
+					port = port_str.to_int()
+		else:
+			var colon := host_part.find(":")
+			if colon != -1:
+				var port_str := host_part.substr(colon + 1)
+				if port_str.is_valid_int():
+					port = port_str.to_int()
+				host = host_part.substr(0, colon)
 		return {
 			"host": host,
 			"port": port,

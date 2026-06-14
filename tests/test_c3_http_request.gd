@@ -498,3 +498,32 @@ class TestParseUrl extends GutTest:
 	func test_fragment_stripped_after_query() -> void:
 		var r := impl._parse_url("https://example.com/page?q=1#section")
 		assert_eq(r["path"], "/page?q=1")
+
+	func test_ipv6_bare_address_default_port() -> void:
+		var r := impl._parse_url("http://[::1]/path")
+		assert_eq(r["host"], "::1")
+		assert_eq(r["port"], 80)
+		assert_false(r["tls"])
+
+	func test_ipv6_with_explicit_port() -> void:
+		var r := impl._parse_url("http://[::1]:8080/path")
+		assert_eq(r["host"], "::1")
+		assert_eq(r["port"], 8080)
+
+	func test_ipv6_https_default_port() -> void:
+		var r := impl._parse_url("https://[::1]/path")
+		assert_eq(r["host"], "::1")
+		assert_eq(r["port"], 443)
+		assert_true(r["tls"])
+
+	func test_ipv6_full_address() -> void:
+		var r := impl._parse_url("https://[2001:db8::1]/path")
+		assert_eq(r["host"], "2001:db8::1")
+		assert_eq(r["port"], 443)
+
+	func test_ipv6_no_path_defaults_to_slash() -> void:
+		var r := impl._parse_url("http://[::1]")
+		assert_eq(r["path"], "/")
+
+	func test_ipv6_unclosed_bracket_returns_empty() -> void:
+		assert_true(impl._parse_url("http://[::1/path").is_empty())
