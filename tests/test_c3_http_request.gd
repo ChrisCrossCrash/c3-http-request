@@ -186,6 +186,25 @@ class TestRequest extends GutTest:
 		var forwarded: C3HTTPRequest.Options = impl.call_log[0]["options"]
 		assert_eq(forwarded.on_status_changed, sink)
 
+	func test_proxy_options_forwarded_to_impl() -> void:
+		var opts := C3HTTPRequest.Options.new()
+		opts.http_proxy_host = "http.proxy.example"
+		opts.http_proxy_port = 8080
+		opts.https_proxy_host = "https.proxy.example"
+		opts.https_proxy_port = 8443
+		await C3HTTPRequest.request(
+			"https://example.com",
+			PackedStringArray(),
+			C3HTTPRequest.Method.GET,
+			"",
+			opts
+		)
+		var forwarded: C3HTTPRequest.Options = impl.call_log[0]["options"]
+		assert_eq(forwarded.http_proxy_host, "http.proxy.example")
+		assert_eq(forwarded.http_proxy_port, 8080)
+		assert_eq(forwarded.https_proxy_host, "https.proxy.example")
+		assert_eq(forwarded.https_proxy_port, 8443)
+
 	func test_2xx_response_is_ok() -> void:
 		impl.preset.ok = true
 		impl.preset.status = 200
@@ -389,11 +408,17 @@ class TestOptions extends GutTest:
 	func test_default_tls_options() -> void:
 		assert_null(C3HTTPRequest.Options.new().tls_options)
 
-	func test_default_proxy_host() -> void:
-		assert_eq(C3HTTPRequest.Options.new().proxy_host, "")
+	func test_default_http_proxy_host() -> void:
+		assert_eq(C3HTTPRequest.Options.new().http_proxy_host, "")
 
-	func test_default_proxy_port() -> void:
-		assert_eq(C3HTTPRequest.Options.new().proxy_port, -1)
+	func test_default_http_proxy_port() -> void:
+		assert_eq(C3HTTPRequest.Options.new().http_proxy_port, -1)
+
+	func test_default_https_proxy_host() -> void:
+		assert_eq(C3HTTPRequest.Options.new().https_proxy_host, "")
+
+	func test_default_https_proxy_port() -> void:
+		assert_eq(C3HTTPRequest.Options.new().https_proxy_port, -1)
 
 	func test_default_cancellation_token() -> void:
 		assert_null(C3HTTPRequest.Options.new().cancellation_token)
@@ -895,3 +920,40 @@ class TestParseUrl extends GutTest:
 
 	func test_ipv6_unclosed_bracket_returns_empty() -> void:
 		assert_true(impl._parse_url("http://[::1/path").is_empty())
+
+
+## Tests for the per-scheme proxy routing decision in [method _Impl._resolve_proxies].
+class TestResolveProxies extends GutTest:
+	var impl: C3HTTPRequest._Impl
+
+	func before_each() -> void:
+		impl = C3HTTPRequest._Impl.new()
+
+	func test_no_proxy_returns_empty() -> void:
+		assert_true(impl._resolve_proxies(C3HTTPRequest.Options.new()).is_empty())
+
+	func test_both_schemes_routed_independently() -> void:
+		var opts := C3HTTPRequest.Options.new()
+		opts.http_proxy_host = "http.proxy.example"
+		opts.http_proxy_port = 8080
+		opts.https_proxy_host = "https.proxy.example"
+		opts.https_proxy_port = 8443
+		var proxies := impl._resolve_proxies(opts)
+		assert_eq(proxies["http"], ["http.proxy.example", 8080])
+		assert_eq(proxies["https"], ["https.proxy.example", 8443])
+
+	func test_only_http_proxy_set() -> void:
+		var opts := C3HTTPRequest.Options.new()
+		opts.http_proxy_host = "http.proxy.example"
+		opts.http_proxy_port = 8080
+		var proxies := impl._resolve_proxies(opts)
+		assert_eq(proxies["http"], ["http.proxy.example", 8080])
+		assert_false(proxies.has("https"))
+
+	func test_only_https_proxy_set() -> void:
+		var opts := C3HTTPRequest.Options.new()
+		opts.https_proxy_host = "https.proxy.example"
+		opts.https_proxy_port = 8443
+		var proxies := impl._resolve_proxies(opts)
+		assert_eq(proxies["https"], ["https.proxy.example", 8443])
+		assert_false(proxies.has("http"))

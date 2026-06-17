@@ -118,13 +118,20 @@ class Options:
 	## [method TLSOptions.client] (validates the server certificate). Override
 	## with [method TLSOptions.client_unsafe] for self-signed certificates.
 	var tls_options: TLSOptions = null
-	## Host of an HTTP/HTTPS proxy to route this request through. Empty means no
-	## proxy (a direct connection). Applies to both [code]http://[/code] and
-	## [code]https://[/code] requests.
-	var proxy_host: String = ""
-	## Port of the proxy named by [member proxy_host]. Ignored when
-	## [member proxy_host] is empty.
-	var proxy_port: int = -1
+	## Host of an HTTP proxy to route plain [code]http://[/code] requests through.
+	## Empty means a direct connection for HTTP. Has no effect on [code]https://[/code]
+	## requests — set [member https_proxy_host] for those.
+	var http_proxy_host: String = ""
+	## Port of the proxy named by [member http_proxy_host]. Ignored when
+	## [member http_proxy_host] is empty.
+	var http_proxy_port: int = -1
+	## Host of an HTTPS proxy to tunnel [code]https://[/code] requests through.
+	## Empty means a direct connection for HTTPS. Has no effect on [code]http://[/code]
+	## requests — set [member http_proxy_host] for those.
+	var https_proxy_host: String = ""
+	## Port of the proxy named by [member https_proxy_host]. Ignored when
+	## [member https_proxy_host] is empty.
+	var https_proxy_port: int = -1
 	## Token for cancelling this request from another coroutine or signal
 	## handler. [code]null[/code] means no cancellation support.
 	var cancellation_token: CancellationToken = null
@@ -352,9 +359,11 @@ class _Impl:
 
 		var client := HTTPClient.new()
 		client.set_read_chunk_size(options.download_chunk_size)
-		if not options.proxy_host.is_empty():
-			client.set_http_proxy(options.proxy_host, options.proxy_port)
-			client.set_https_proxy(options.proxy_host, options.proxy_port)
+		var proxies := _resolve_proxies(options)
+		if proxies.has("http"):
+			client.set_http_proxy(proxies["http"][0], proxies["http"][1])
+		if proxies.has("https"):
+			client.set_https_proxy(proxies["https"][0], proxies["https"][1])
 
 		var err: int
 		if parsed["tls"]:
@@ -691,6 +700,17 @@ class _Impl:
 			"path": path,
 			"tls": scheme == "https"
 		}
+
+	# Resolves which proxy applies to each scheme. A key ("http"/"https") is present
+	# only when that scheme has a non-empty host; its value is [host, port]. Kept pure
+	# (no HTTPClient) so the per-scheme routing can be unit-tested without a network.
+	func _resolve_proxies(options: Options) -> Dictionary:
+		var proxies := {}
+		if not options.http_proxy_host.is_empty():
+			proxies["http"] = [options.http_proxy_host, options.http_proxy_port]
+		if not options.https_proxy_host.is_empty():
+			proxies["https"] = [options.https_proxy_host, options.https_proxy_port]
+		return proxies
 
 	func _timed_out(start_ms: int, timeout: float) -> bool:
 		if timeout <= 0.0:
