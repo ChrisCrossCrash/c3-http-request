@@ -58,6 +58,7 @@ No node, no signal, no tree — and `res.ok` is a single check that already acco
 - Connection status — pass an `on_status_changed` callback to observe the `HTTPClient` lifecycle (resolving, connecting, requesting, body)
 - Automatic gzip/deflate decompression when the server sends compressed responses
 - Redirect following with a configurable depth limit
+- Optional threaded mode — set `use_threads` to poll on a background thread at OS speed instead of once per frame, with callbacks auto-marshaled back to the main thread
 
 ## Comparison with HTTPRequest
 
@@ -83,9 +84,21 @@ No node, no signal, no tree — and `res.ok` is a single check that already acco
 | HTTP/HTTPS proxy                        |       ✓       |              ✓               |
 | Download progress events                |       ✓       |              ✓               |
 | Connection status callback              |       ✓       | ✓ `get_http_client_status()` |
-| Threaded requests (off main loop)       |       —       |              ✓               |
+| Threaded requests (off main loop)       |       ✓       |              ✓               |
 
 <sub>\* When `Options.download_file` is set, the response body is written to disk as-is — decompression is skipped and the file may contain raw compressed bytes.</sub>
+
+## Benchmarks
+
+Benchmarked on Godot 4.6.2, AMD Ryzen 5 7600, Windows, against a remote API. Reproduce with [`examples/benchmark/`](examples/benchmark/). See [BENCHMARK.md](BENCHMARK.md) for the full analysis and raw output.
+
+**Highlights:**
+
+- **Latency:** In cooperative mode at a capped frame rate, C3HTTPRequest resolves ~1 frame sooner per request (e.g. 183 ms vs 200 ms at 60 fps — a 16.7 ms gap that tracks the frame period exactly). In threaded mode, or uncapped, both clients hit the same ~167 ms network floor. The difference is purely the native node's extra per-frame poll, not faster networking.
+- **Downloads:** For large cooperative downloads the gap is structural. An 8 MB body at 60 fps takes ~600 ms with C3HTTPRequest vs ~2367 ms with native (~4×), because the native node reads one chunk per frame — capping throughput at `chunk_size × fps` regardless of available bandwidth — while C3HTTPRequest drains all buffered data each frame. Verified against the Godot 4.6.2 source in [BENCHMARK.md](BENCHMARK.md). With `use_threads = true`, both clients deliver full link bandwidth and are equal (~600 ms). Small responses fit in a frame or two of bandwidth, so the two are equivalent there.
+- **Concurrency:** Both clients scale smoothly through 8 simultaneous requests. In cooperative mode native is consistently ~1 frame slower per level (matching the single-request result); in threaded mode the two converge as concurrency rises.
+
+Threaded mode and uncapped runs are RTT- or bandwidth-limited, so the clients are effectively equal there — the cooperative, capped-frame-rate differences above are where C3HTTPRequest's polling model shows an edge. See [BENCHMARK.md](BENCHMARK.md) for the full tables, methodology, and raw output.
 
 ## Compatibility
 
@@ -149,21 +162,22 @@ var res3 := await C3HTTPRequest.request(url, PackedStringArray(), C3HTTPRequest.
 
 ## Options
 
-| Property              | Type                | Default | Description                                                                                                                    |
-| --------------------- | ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `timeout`             | `float`             | `0.0`   | Maximum seconds to wait. `0.0` disables the timeout.                                                                           |
-| `body_size_limit`     | `int`               | `-1`    | Maximum response body size in bytes. `-1` is unlimited.                                                                        |
-| `download_chunk_size` | `int`               | `65536` | Read buffer size in bytes.                                                                                                     |
-| `accept_gzip`         | `bool`              | `true`  | Inject `Accept-Encoding: gzip, deflate` and auto-decompress.                                                                   |
-| `max_redirects`       | `int`               | `8`     | Maximum redirects to follow. `0` disables following.                                                                           |
-| `download_file`       | `String`            | `""`    | Path to stream the body to on disk. Empty keeps the body in memory.                                                            |
-| `tls_options`         | `TLSOptions`        | `null`  | `null` uses `TLSOptions.client()`. Override for self-signed certificates.                                                      |
-| `proxy_host`          | `String`            | `""`    | Route http/https requests through a proxy host. Empty = direct connection.                                                     |
-| `proxy_port`          | `int`               | `-1`    | Port of `proxy_host`. Ignored when `proxy_host` is empty.                                                                      |
-| `cancellation_token`  | `CancellationToken` | `null`  | Token for cancelling the request. `null` disables cancellation support.                                                        |
-| `on_sse_event`        | `Callable`          | empty   | When set, parse a 2xx body as an SSE stream and invoke this per event. See [Server-Sent Events](#server-sent-events-sse).      |
-| `on_progress`         | `Callable`          | empty   | When set, invoke `(bytes_received, total_bytes)` per chunk as the body downloads. See [Download progress](#download-progress). |
-| `on_status_changed`   | `Callable`          | empty   | When set, invoke `(status)` each time the `HTTPClient` status changes. See [Connection status](#connection-status).            |
+| Property              | Type                | Default | Description                                                                                                                                                                      |
+| --------------------- | ------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `timeout`             | `float`             | `0.0`   | Maximum seconds to wait. `0.0` disables the timeout.                                                                                                                             |
+| `body_size_limit`     | `int`               | `-1`    | Maximum response body size in bytes. `-1` is unlimited.                                                                                                                          |
+| `download_chunk_size` | `int`               | `65536` | Read buffer size in bytes.                                                                                                                                                       |
+| `accept_gzip`         | `bool`              | `true`  | Inject `Accept-Encoding: gzip, deflate` and auto-decompress.                                                                                                                     |
+| `max_redirects`       | `int`               | `8`     | Maximum redirects to follow. `0` disables following.                                                                                                                             |
+| `use_threads`         | `bool`              | `false` | Run the polling loop on a background thread at OS speed instead of once per frame. Callbacks are auto-marshaled to the main thread. See [Threaded requests](#threaded-requests). |
+| `download_file`       | `String`            | `""`    | Path to stream the body to on disk. Empty keeps the body in memory.                                                                                                              |
+| `tls_options`         | `TLSOptions`        | `null`  | `null` uses `TLSOptions.client()`. Override for self-signed certificates.                                                                                                        |
+| `proxy_host`          | `String`            | `""`    | Route http/https requests through a proxy host. Empty = direct connection.                                                                                                       |
+| `proxy_port`          | `int`               | `-1`    | Port of `proxy_host`. Ignored when `proxy_host` is empty.                                                                                                                        |
+| `cancellation_token`  | `CancellationToken` | `null`  | Token for cancelling the request. `null` disables cancellation support.                                                                                                          |
+| `on_sse_event`        | `Callable`          | empty   | When set, parse a 2xx body as an SSE stream and invoke this per event. See [Server-Sent Events](#server-sent-events-sse).                                                        |
+| `on_progress`         | `Callable`          | empty   | When set, invoke `(bytes_received, total_bytes)` per chunk as the body downloads. See [Download progress](#download-progress).                                                   |
+| `on_status_changed`   | `Callable`          | empty   | When set, invoke `(status)` each time the `HTTPClient` status changes. See [Connection status](#connection-status).                                                              |
 
 ## Error handling
 
@@ -255,3 +269,21 @@ A typical request reports `STATUS_RESOLVING`/`STATUS_CONNECTING` → `STATUS_CON
 - **Fires in every mode**, including `download_file` and SSE (`on_sse_event`), since it tracks the connection, not the body.
 - **Repeats per redirect hop** — each hop opens a fresh connection, so the connect → request → body sequence is emitted again for every hop followed.
 - **Best-effort** — a very brief intermediate state may be coalesced, since the status is sampled once per poll.
+
+### Threaded requests
+
+By default the polling loop yields to the scene tree once per frame, so it advances at most once per rendered frame (the same cadence as the native `HTTPRequest` node). Set `Options.use_threads` to `true` to run the loop on a dedicated background thread that polls at OS speed instead — lowering latency for fast endpoints and keeping the main thread free during large or streaming downloads.
+
+```gdscript
+var opts := C3HTTPRequest.Options.new()
+opts.use_threads = true
+
+var res := await C3HTTPRequest.request("https://example.com/large-file", PackedStringArray(), C3HTTPRequest.Method.GET, "", opts)
+```
+
+Notes:
+
+- **The `await` API is unchanged** — `request()` still returns a `Response` you `await` exactly as before.
+- **Callbacks stay main-thread-safe** — `on_sse_event`, `on_progress`, and `on_status_changed` are automatically marshaled back to the main thread, so they may freely touch the scene tree. They are also guaranteed to have all fired by the time the `await` resolves.
+- **Cancellation and redirects** work as usual; a redirect chain reuses the same single worker thread.
+- **Fallback** — on export templates without thread support (e.g. single-threaded web builds), this transparently falls back to the cooperative per-frame loop.

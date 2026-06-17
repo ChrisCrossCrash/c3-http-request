@@ -13,7 +13,8 @@ class TestableImpl extends C3HTTPRequest._Impl:
 		method: int,
 		request_data: Variant,
 		options: C3HTTPRequest.Options,
-		_redirects_left: int = -1
+		_redirects_left: int = -1,
+		_on_worker: bool = false
 	) -> C3HTTPRequest.Response:
 		call_log.append({
 			"url": url,
@@ -129,6 +130,7 @@ class TestRequest extends GutTest:
 		assert_eq(opts.timeout, 0.0)
 		assert_eq(opts.max_redirects, 8)
 		assert_true(opts.accept_gzip)
+		assert_false(opts.use_threads)
 
 	func test_options_forwarded_when_provided() -> void:
 		var opts := C3HTTPRequest.Options.new()
@@ -142,6 +144,19 @@ class TestRequest extends GutTest:
 			opts
 		)
 		assert_eq(impl.call_log[0]["options"], opts)
+
+	func test_use_threads_forwarded_to_impl() -> void:
+		var opts := C3HTTPRequest.Options.new()
+		opts.use_threads = true
+		await C3HTTPRequest.request(
+			"https://example.com",
+			PackedStringArray(),
+			C3HTTPRequest.Method.GET,
+			"",
+			opts
+		)
+		var forwarded: C3HTTPRequest.Options = impl.call_log[0]["options"]
+		assert_true(forwarded.use_threads)
 
 	func test_on_progress_forwarded_to_impl() -> void:
 		var sink := func(_received: int, _total: int) -> void: pass
@@ -550,10 +565,10 @@ class TestSSEParsing extends GutTest:
 		assert_eq(rest.get_string_from_utf8(), "data: b")
 
 	func test_drain_keeps_split_multibyte_char_intact() -> void:
-		# "héllo" — the 'é' is two UTF-8 bytes; the buffer ends mid-character with
+		# "h😎" — the 😎 emoji is four UTF-8 bytes; the buffer ends mid-character with
 		# no boundary yet, so nothing is dispatched and all bytes are retained.
 		var partial := "data: h".to_utf8_buffer()
-		partial.append(0xC3) # first byte of 'é'
+		partial.append(0xF0) # first byte of 😎 (U+1F60E, encoded F0 9F 98 8E)
 		var rest := impl._drain_sse_buffer(partial, _sink())
 		assert_eq(events, [])
 		assert_eq(rest, partial)

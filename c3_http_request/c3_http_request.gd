@@ -80,6 +80,36 @@ class Options:
 	var accept_gzip: bool = true
 	## Maximum number of redirects to follow. [code]0[/code] disables following.
 	var max_redirects: int = 8
+	## When [code]true[/code], the polling loop runs on a dedicated background
+	## thread that polls at OS speed rather than once per rendered frame, lowering
+	## latency for fast endpoints and large or streaming downloads. The public
+	## [code]await[/code] API is unchanged, and this falls back to the cooperative
+	## loop on export templates without thread support.
+	## [br][br]
+	## The [member on_sse_event], [member on_progress], and
+	## [member on_status_changed] callbacks are automatically marshaled back to the
+	## main thread, so they stay safe to touch the scene tree. Marshaling uses
+	## [code]call_deferred[/code], which would normally let a callback run on a
+	## [i]later[/i] frame — but this client drains all pending callbacks before the
+	## [code]await[/code] resolves. So any state a callback mutates is fully settled
+	## by the time the response comes back, and the result is identical whether or
+	## not threading is on:
+	## [codeblock]
+	## # Count the connection-status changes via a callback.
+	## var status_changes: Array[int] = []
+	## var opts := C3HTTPRequest.Options.new()
+	## opts.use_threads = true
+	## opts.on_status_changed = func(status: HTTPClient.Status) -> void:
+	##     status_changes.append(status)
+	##
+	## await C3HTTPRequest.request("https://example.com",
+	##     PackedStringArray(), C3HTTPRequest.Method.GET, "", opts)
+	##
+	## # Every status change has already fired — none is still queued for a later
+	## # frame — so this prints the same count with use_threads true or false.
+	## print(status_changes.size())
+	## [/codeblock]
+	var use_threads: bool = false
 	## Path to write the response body to on disk. When non-empty,
 	## [member Response.body] is empty and the data is in the file. A partial
 	## file may be left on disk if the request fails after the connection opens.
@@ -155,9 +185,7 @@ class Response:
 			if _text_cache == null:
 				_text_cache = body.get_string_from_utf8()
 				if _text_cache == "" and not body.is_empty():
-					push_error(
-						"C3HTTPRequest: response body is not valid UTF-8."
-					)
+					push_error("C3HTTPRequest: response body is not valid UTF-8.")
 			return _text_cache
 
 	var _text_cache: Variant = null
@@ -271,14 +299,30 @@ class CancellationToken:
 
 
 class _Impl:
+	# Worker-thread poll pacing in microseconds (1 ms), mirroring the cadence of
+	# HTTPRequest's threaded mode. Only used when running on a worker thread.
+	# Note: on Windows, using OS.delay_usec with any value less than 2000
+	# is effectively the same as 2000 due to the scheduler's granularity.
+	const _PUMP_DELAY_USEC := 1000
+
 	func execute(
 		url: String,
 		custom_headers: PackedStringArray,
 		method: int,
 		request_data: Variant,
 		options: C3HTTPRequest.Options,
-		_redirects_left: int = -1
+		_redirects_left: int = -1,
+		_on_worker: bool = false
 	) -> C3HTTPRequest.Response:
+		# options.use_threads is read exactly once — here — to decide whether to
+		# spawn a worker. Every downstream poll and dispatch decision uses _on_worker
+		# instead, so the fallback path (threads requested but unavailable) behaves
+		# identically to the cooperative path.
+		if options.use_threads and not _on_worker and _threads_available():
+			return await _run_threaded(
+				url, custom_headers, method, request_data, options, _redirects_left
+			)
+
 		if _cancelled(options):
 			return _fail(C3HTTPRequest.RequestError.cancelled("Request was cancelled."))
 		var redirects_left := (
@@ -333,7 +377,7 @@ class _Impl:
 
 		while true:
 			client.poll()
-			last_status = _emit_status_change(client, last_status, options)
+			last_status = _emit_status_change(client, last_status, options, _on_worker)
 			if client.get_status() not in [
 				HTTPClient.STATUS_CONNECTING, HTTPClient.STATUS_RESOLVING
 			]:
@@ -346,7 +390,7 @@ class _Impl:
 				return _fail(C3HTTPRequest.RequestError.cancelled(
 						"Request was cancelled."
 				))
-			await tree.process_frame
+			await _pump(tree, _on_worker)
 
 		if client.get_status() != HTTPClient.STATUS_CONNECTED:
 			return _fail(C3HTTPRequest.RequestError.transport(
@@ -368,7 +412,7 @@ class _Impl:
 
 		while true:
 			client.poll()
-			last_status = _emit_status_change(client, last_status, options)
+			last_status = _emit_status_change(client, last_status, options, _on_worker)
 			if client.get_status() != HTTPClient.STATUS_REQUESTING:
 				break
 			if _timed_out(start_ms, options.timeout):
@@ -379,7 +423,7 @@ class _Impl:
 				return _fail(C3HTTPRequest.RequestError.cancelled(
 					"Request was cancelled."
 				))
-			await tree.process_frame
+			await _pump(tree, _on_worker)
 
 		if not client.has_response():
 			return _fail(C3HTTPRequest.RequestError.transport(
@@ -392,6 +436,12 @@ class _Impl:
 		# A 2xx body with a sink set is parsed as an SSE stream; everything else
 		# (non-2xx error bodies, redirect bodies) is collected normally.
 		var sse_mode := streaming and status >= 200 and status < 300
+		# On a worker thread, marshal SSE events back to the main thread so the
+		# caller's sink never runs off-thread; otherwise dispatch directly.
+		var sse_sink := options.on_sse_event
+		if _on_worker and sse_sink.is_valid():
+			sse_sink = func(data: String, event_type: String) -> void:
+				options.on_sse_event.call_deferred(data, event_type)
 		var body_bytes := PackedByteArray()
 		var sse_buffer := PackedByteArray()
 		var last_recv_ms := start_ms
@@ -415,10 +465,10 @@ class _Impl:
 					"Request was cancelled."
 				))
 			client.poll()
-			last_status = _emit_status_change(client, last_status, options)
+			last_status = _emit_status_change(client, last_status, options, _on_worker)
 			var chunk: PackedByteArray = client.read_response_body_chunk()
 			if chunk.is_empty():
-				await tree.process_frame
+				await _pump(tree, _on_worker)
 				continue
 			last_recv_ms = Time.get_ticks_msec()
 			if sse_mode:
@@ -433,7 +483,7 @@ class _Impl:
 						% options.body_size_limit
 					))
 				sse_buffer.append_array(chunk)
-				sse_buffer = _drain_sse_buffer(sse_buffer, options.on_sse_event)
+				sse_buffer = _drain_sse_buffer(sse_buffer, sse_sink)
 				continue
 			if (
 				options.body_size_limit >= 0
@@ -450,8 +500,7 @@ class _Impl:
 			else:
 				body_bytes.append_array(chunk)
 			bytes_received += chunk.size()
-			if options.on_progress.is_valid():
-				options.on_progress.call(bytes_received, total_bytes)
+			_emit(options.on_progress, _on_worker, [bytes_received, total_bytes])
 
 		if file != null:
 			file.close()
@@ -461,7 +510,7 @@ class _Impl:
 		if sse_mode:
 			var tail := sse_buffer.get_string_from_utf8()
 			if not tail.strip_edges().is_empty():
-				_emit_sse_event(tail, options.on_sse_event)
+				_emit_sse_event(tail, sse_sink)
 
 		if options.accept_gzip and file == null and not body_bytes.is_empty():
 			var encoding := _header_value(resp_headers, "Content-Encoding").to_lower()
@@ -490,7 +539,8 @@ class _Impl:
 					_redirect_method(method, status),
 					_redirect_body(method, status, request_data),
 					options,
-					redirects_left - 1
+					redirects_left - 1,
+					_on_worker
 				)
 
 		var res := C3HTTPRequest.Response.new()
@@ -517,6 +567,82 @@ class _Impl:
 				e.message = "Request failed with status %d." % status
 			res.error = e
 		return res
+
+	# Yields between polls. On a worker thread it sleeps briefly and returns
+	# synchronously — the await never suspends, so execute() runs straight through
+	# on the worker. On the main thread it yields to the next frame, keeping it
+	# responsive.
+	func _pump(tree: SceneTree, on_worker: bool) -> void:
+		if on_worker:
+			OS.delay_usec(_PUMP_DELAY_USEC)
+		else:
+			await tree.process_frame
+
+	# Runs execute() on a dedicated background thread (polling at OS speed) and
+	# awaits its completion on the main thread, leaving the public await API
+	# unchanged. The worker re-enters execute() with _on_worker = true.
+	func _run_threaded(
+		url: String,
+		custom_headers: PackedStringArray,
+		method: int,
+		request_data: Variant,
+		options: C3HTTPRequest.Options,
+		redirects_left: int
+	) -> C3HTTPRequest.Response:
+		var tree := Engine.get_main_loop() as SceneTree
+		# Marshaled callbacks are dispatched with call_deferred from the worker, so
+		# they run on the main thread at the next message-queue flush. We must drain
+		# that queue before resolving so every callback fires before the Response —
+		# but only when a callback is actually configured.
+		var has_observers := (
+			options.on_sse_event.is_valid()
+			or options.on_progress.is_valid()
+			or options.on_status_changed.is_valid()
+		)
+		var thread := Thread.new()
+		thread.start(
+			func() -> C3HTTPRequest.Response:
+				return await execute(
+					url, custom_headers, method, request_data, options,
+					redirects_left, true
+				)
+		)
+		while thread.is_alive():
+			await tree.process_frame
+		var result: Variant = thread.wait_to_finish()
+		# Enforce the worker-never-suspends invariant: on the worker path _pump
+		# sleeps synchronously and never yields, so execute() must run straight
+		# through and the thread function must return a Response. If a future change
+		# adds an await that actually suspends, the function returns a coroutine
+		# state instead — fail loudly here rather than corrupting the result.
+		assert(
+			result is C3HTTPRequest.Response,
+			"C3HTTPRequest: threaded worker suspended; the worker path must run "
+			+ "synchronously (see _pump). Did a new await get added to execute()?"
+		)
+		var res: C3HTTPRequest.Response = result
+		if has_observers:
+			# One more frame guarantees a message-queue flush after the worker has
+			# returned, so all deferred callbacks fire before this Response resolves.
+			await tree.process_frame
+		return res
+
+	# Whether the current platform supports spawning worker threads. Single-threaded
+	# export templates (e.g. web without thread support) fall back to the
+	# cooperative loop.
+	func _threads_available() -> bool:
+		return OS.has_feature("threads")
+
+	# Invokes an observer callback, marshaling to the main thread via call_deferred
+	# when running on a worker so the caller's callback never touches the scene tree
+	# off-thread; otherwise dispatches it directly.
+	func _emit(cb: Callable, threaded: bool, args: Array) -> void:
+		if not cb.is_valid():
+			return
+		if threaded:
+			cb.bindv(args).call_deferred()
+		else:
+			cb.callv(args)
 
 	func _parse_url(url: String) -> Dictionary:
 		var sep := url.find("://")
@@ -582,11 +708,12 @@ class _Impl:
 	func _emit_status_change(
 		client: HTTPClient,
 		last_status: HTTPClient.Status,
-		options: C3HTTPRequest.Options
+		options: C3HTTPRequest.Options,
+		on_worker: bool
 	) -> HTTPClient.Status:
 		var current := client.get_status()
-		if current != last_status and options.on_status_changed.is_valid():
-			options.on_status_changed.call(current)
+		if current != last_status:
+			_emit(options.on_status_changed, on_worker, [current])
 		return current
 
 	func _header_value(headers: PackedStringArray, name: String) -> String:

@@ -24,6 +24,10 @@ config/features=PackedStringArray("4.6", "Forward Plus")
 
 driver/enable_input=true
 
+[display]
+
+window/vsync/vsync_mode=0
+
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/gut/plugin.cfg")
