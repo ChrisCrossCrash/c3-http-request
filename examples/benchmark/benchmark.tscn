@@ -1,42 +1,12 @@
 [gd_scene format=3 uid="uid://b5686o5gufm65"]
 
 [ext_resource type="Script" uid="uid://bofnktp4xnds5" path="res://examples/benchmark/benchmark.gd" id="1"]
-[ext_resource type="PackedScene" uid="uid://bf7rcp1yln3qg" path="res://examples/benchmark/Monkey.glb" id="2_yyf07"]
+[ext_resource type="PackedScene" uid="uid://drmnky0stage1" path="res://examples/shared/rotating_monkey.tscn" id="2"]
 
-[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_yyf07"]
-sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
-ground_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
-
-[sub_resource type="Sky" id="Sky_okoa5"]
-sky_material = SubResource("ProceduralSkyMaterial_yyf07")
-
-[sub_resource type="Environment" id="Environment_m0mrt"]
-background_mode = 1
-background_color = Color(0.06666667, 0.06666667, 0.06666667, 1)
-sky = SubResource("Sky_okoa5")
-ambient_light_source = 3
-tonemap_mode = 2
-glow_enabled = true
-
-[node name="Benchmark" type="Node3D" unique_id=1473731393]
+[node name="Benchmark" type="Node" unique_id=1095347223]
 script = ExtResource("1")
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1590966874]
-environment = SubResource("Environment_m0mrt")
-
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1215388045]
-transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.50000006, 0.75, -0.43301266, 0, 0, 0)
-shadow_enabled = true
-directional_shadow_max_distance = 1.0
-
-[node name="Monkey" parent="." unique_id=1805422125 instance=ExtResource("2_yyf07")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.07283664, 0, 0.1581409)
-
-[node name="Camera3D" type="Camera3D" parent="." unique_id=1887557406]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 10)
-projection = 1
-fov = 18.4
-size = 2.869
+[node name="RotatingMonkey" parent="." unique_id=1805422125 instance=ExtResource("2")]
 
 [node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=1285066232]
 

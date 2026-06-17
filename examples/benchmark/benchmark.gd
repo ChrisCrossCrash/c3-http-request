@@ -57,7 +57,6 @@ var _frame_times: Array[float] = []
 # cap aren't compared against the previous cap's.
 var _last_max_fps := -1
 
-@onready var monkey: Node3D = $Monkey
 @onready var fps_label: Label = $CanvasLayer/FPSLabel
 @onready var status_label: RichTextLabel = $CanvasLayer/StatusLabel
 
@@ -97,7 +96,6 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	monkey.rotate_z(delta)
 	# A cap change makes the new cap's frames incomparable to the old; start fresh.
 	if Engine.max_fps != _last_max_fps:
 		_last_max_fps = Engine.max_fps

@@ -4,12 +4,12 @@ importer="scene"
 importer_version=1
 type="PackedScene"
 uid="uid://bf7rcp1yln3qg"
-path="res://.godot/imported/Monkey.glb-4b28eeed2098db96b2083190b22905d9.scn"
+path="res://.godot/imported/Monkey.glb-9efb3fbe53d7ed44be4551404c54af2d.scn"
 
 [deps]
 
-source_file="res://examples/benchmark/Monkey.glb"
-dest_files=["res://.godot/imported/Monkey.glb-4b28eeed2098db96b2083190b22905d9.scn"]
+source_file="res://examples/shared/Monkey.glb"
+dest_files=["res://.godot/imported/Monkey.glb-9efb3fbe53d7ed44be4551404c54af2d.scn"]
 
 [params]
 
