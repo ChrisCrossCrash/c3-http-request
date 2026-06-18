@@ -1,9 +1,18 @@
-[gd_scene load_steps=3 format=3 uid="uid://bvwdmvr4471hn"]
+[gd_scene format=3 uid="uid://bvwdmvr4471hn"]
 
 [ext_resource type="Script" uid="uid://cmi3ydyeihoka" path="res://examples/c3_http_request_demo/c3_http_request_demo.gd" id="1_n0cgt"]
-[ext_resource type="PackedScene" uid="uid://drmnky0stage1" path="res://examples/shared/rotating_monkey.tscn" id="2_rmnky"]
+[ext_resource type="PackedScene" uid="uid://drmnky0stage1" path="res://examples/shared/rotating_monkey/rotating_monkey.tscn" id="2_rmnky"]
+[ext_resource type="PackedScene" uid="uid://slr7er2cdtbm" path="res://examples/shared/output_overlay/output_overlay.tscn" id="3_ovrly"]
 
 [node name="C3HttpRequestDemo" type="Node" unique_id=2022103133]
 script = ExtResource("1_n0cgt")
 
-[node name="RotatingMonkey" parent="." instance=ExtResource("2_rmnky")]
+[node name="RotatingMonkey" parent="." unique_id=557895311 instance=ExtResource("2_rmnky")]
+
+[node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=532853129]
+
+[node name="OutputOverlay" parent="CanvasLayer" unique_id=780891354 instance=ExtResource("3_ovrly")]
+offset_left = 8.0
+offset_top = 8.0
+offset_right = -8.0
+offset_bottom = -8.0

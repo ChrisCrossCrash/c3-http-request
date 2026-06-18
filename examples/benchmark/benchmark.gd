@@ -59,6 +59,7 @@ var _last_max_fps := -1
 
 @onready var fps_label: Label = $CanvasLayer/FPSLabel
 @onready var status_label: RichTextLabel = $CanvasLayer/StatusLabel
+@onready var output_overlay: OutputOverlay = $CanvasLayer/OutputOverlay
 
 
 func _ready() -> void:
@@ -82,7 +83,7 @@ func _ready() -> void:
 	await _bench_latency(LATENCY_URL)
 	await _bench_concurrency(CONCURRENCY_URL)
 	await _bench_download()
-	print("\nDone.")
+	output_overlay.print_with_overlay("\nDone.")
 	_phase = "Done."
 	_show_status()
 	# The editor's remote debugger forwards print output asynchronously, so quitting
@@ -139,8 +140,9 @@ func _print_environment() -> void:
 	var renderer := ProjectSettings.get_setting(
 		"rendering/renderer/rendering_method", "?"
 	) as String
-	print("C3HTTPRequest benchmark vs native HTTPRequest")
-	print("Godot %s | %s | %s | %s renderer" % [
+	output_overlay.print_with_overlay("C3HTTPRequest benchmark vs native HTTPRequest")
+	output_overlay.print_with_overlay("commit %s" % _git_commit())
+	output_overlay.print_with_overlay("Godot %s | %s | %s | %s renderer" % [
 		v.get("string", "?"), OS.get_name(), OS.get_processor_name(), renderer
 	])
 
@@ -150,7 +152,7 @@ func _print_environment() -> void:
 
 func _bench_latency(url: String) -> void:
 	_server = _host_from_url(url)
-	print("\n== Single-request latency (median of %d requests) ==" % RUNS)
+	output_overlay.print_with_overlay("\n== Single-request latency (median of %d requests) ==" % RUNS)
 	for cap: int in FRAME_CAPS:
 		Engine.max_fps = cap
 		var label := "uncapped" if cap == 0 else "%d fps" % cap
@@ -173,11 +175,11 @@ func _bench_latency(url: String) -> void:
 			native_coop.append(await _time_native(url, false))
 			native_threaded.append(await _time_native(url, true))
 		Engine.max_fps = 0
-		print("\n%-12s         cooperative   threaded" % label)
-		print("C3HTTPRequest:        %7.2f ms   %7.2f ms" % [
+		output_overlay.print_with_overlay("\n%-12s         cooperative   threaded" % label)
+		output_overlay.print_with_overlay("C3HTTPRequest:        %7.2f ms   %7.2f ms" % [
 			_median_ms(c3_coop), _median_ms(c3_threaded)
 		])
-		print("native HTTPRequest:   %7.2f ms   %7.2f ms" % [
+		output_overlay.print_with_overlay("native HTTPRequest:   %7.2f ms   %7.2f ms" % [
 			_median_ms(native_coop), _median_ms(native_threaded)
 		])
 
@@ -187,12 +189,12 @@ func _bench_latency(url: String) -> void:
 
 func _bench_concurrency(url: String) -> void:
 	_server = _host_from_url(url)
-	print(
+	output_overlay.print_with_overlay(
 		"\n== Concurrency: wall-clock to complete N simultaneous requests"
 		+ " (median of %d batches, %d fps) ==" % [CONCURRENCY_REPS, CONCURRENCY_FPS]
 	)
 	Engine.max_fps = CONCURRENCY_FPS
-	print("    N   C3 coop      nat coop     C3 thread    nat thread")
+	output_overlay.print_with_overlay("    N   C3 coop      nat coop     C3 thread    nat thread")
 	for n: int in CONCURRENCY_LEVELS:
 		_phase = "Concurrency · N=%d" % n
 		_show_status()
@@ -209,7 +211,7 @@ func _bench_concurrency(url: String) -> void:
 			c3_threaded.append(await _time_c3_concurrent(url, n, true))
 			native_coop.append(await _time_native_concurrent(url, n, false))
 			native_threaded.append(await _time_native_concurrent(url, n, true))
-		print(
+		output_overlay.print_with_overlay(
 			"%5d   %8.2f ms   %8.2f ms   %8.2f ms   %8.2f ms"
 			% [n, _median_ms(c3_coop), _median_ms(native_coop), _median_ms(c3_threaded), _median_ms(native_threaded)]
 		)
@@ -323,10 +325,10 @@ func _count_completion(
 
 func _bench_download() -> void:
 	_server = _host_from_url(DOWNLOAD_URL)
-	print("\n== File download to disk (median of %d runs, %d fps) ==" % [
+	output_overlay.print_with_overlay("\n== File download to disk (median of %d runs, %d fps) ==" % [
 		DOWNLOAD_REPS, DOWNLOAD_FPS
 	])
-	print("Target: %s" % (DOWNLOAD_URL % (DOWNLOAD_SIZES_MB[0] * 1024 * 1024)))
+	output_overlay.print_with_overlay("Target: %s" % (DOWNLOAD_URL % (DOWNLOAD_SIZES_MB[0] * 1024 * 1024)))
 	Engine.max_fps = DOWNLOAD_FPS
 	for mb: int in DOWNLOAD_SIZES_MB:
 		var url := DOWNLOAD_URL % (mb * 1024 * 1024)
@@ -344,11 +346,11 @@ func _bench_download() -> void:
 			c3_threaded.append(await _time_c3_download(url, true))
 			native_coop.append(await _time_native_download(url, false))
 			native_threaded.append(await _time_native_download(url, true))
-		print("\n%-12s         cooperative   threaded" % ("%d MB" % mb))
-		print("C3HTTPRequest:        %7.2f ms   %7.2f ms" % [
+		output_overlay.print_with_overlay("\n%-12s         cooperative   threaded" % ("%d MB" % mb))
+		output_overlay.print_with_overlay("C3HTTPRequest:        %7.2f ms   %7.2f ms" % [
 			_median_ms(c3_coop), _median_ms(c3_threaded)
 		])
-		print("native HTTPRequest:   %7.2f ms   %7.2f ms" % [
+		output_overlay.print_with_overlay("native HTTPRequest:   %7.2f ms   %7.2f ms" % [
 			_median_ms(native_coop), _median_ms(native_threaded)
 		])
 	Engine.max_fps = 0
@@ -397,6 +399,23 @@ func _host_from_url(url: String) -> String:
 	var after_scheme := url.split("://", true, 1)
 	var host_part := after_scheme[1] if after_scheme.size() > 1 else url
 	return host_part.split("/")[0].split("?")[0]
+
+
+# Short commit hash of the working tree, with a "-dirty" suffix when there are
+# uncommitted changes, so a posted result names the exact version that produced
+# it. Returns "unknown" when git is unavailable (e.g. an exported build).
+func _git_commit() -> String:
+	var output: Array = []
+	if OS.execute("git", ["rev-parse", "--short", "HEAD"], output) != 0:
+		return "unknown"
+	var commit := (output[0] as String).strip_edges()
+	if commit.is_empty():
+		return "unknown"
+	var status: Array = []
+	OS.execute("git", ["status", "--porcelain"], status)
+	if status.size() > 0 and not (status[0] as String).strip_edges().is_empty():
+		commit += "-dirty"
+	return commit
 
 
 func _median_ms(samples: Array[int]) -> float:

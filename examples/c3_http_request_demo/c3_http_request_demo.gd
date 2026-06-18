@@ -1,5 +1,10 @@
 extends Node
 
+# How many Server-Sent Events to collect before cancelling the stream.
+const SSE_EVENT_COUNT := 10
+
+@onready var output_overlay: OutputOverlay = $CanvasLayer/OutputOverlay
+
 
 func _ready() -> void:
 	await demo_get()
@@ -13,32 +18,30 @@ func _ready() -> void:
 	await demo_status()
 	await demo_cancellation()
 	await demo_sse()
-	print("\nDone.")
-	await get_tree().process_frame # Let pending prints flush before quitting.
-	get_tree().quit()
+	output_overlay.print_with_overlay("\nDone.")
 
 
 func demo_get() -> void:
-	print("\n--- GET ---")
+	output_overlay.print_with_overlay("\n--- GET ---")
 	# accept_gzip is true by default: Accept-Encoding: gzip, deflate is
 	# injected and the response body is transparently decompressed.
 	var res := await C3HTTPRequest.request(
 		"https://jsonplaceholder.typicode.com/todos/1"
 	)
 	if not res.ok:
-		print("error: ", str(res.error))
+		output_overlay.print_with_overlay("error: ", str(res.error))
 		return
-	print("status:       ", res.status)
-	print("content-type: ", _header_value(res.headers, "Content-Type"))
-	print("body:         ", res.text)
+	output_overlay.print_with_overlay("status:       ", res.status)
+	output_overlay.print_with_overlay("content-type: ", _header_value(res.headers, "Content-Type"))
+	output_overlay.print_with_overlay("body:         ", res.text)
 	# res.json parses the body once and caches it; pull out a field directly.
 	var parsed: Variant = res.json
 	if parsed is Dictionary:
-		print("json.title:   ", parsed.get("title", ""))
+		output_overlay.print_with_overlay("json.title:   ", parsed.get("title", ""))
 
 
 func demo_post() -> void:
-	print("\n--- POST ---")
+	output_overlay.print_with_overlay("\n--- POST ---")
 	var res := await C3HTTPRequest.request(
 		"https://jsonplaceholder.typicode.com/posts",
 		PackedStringArray(["Content-Type: application/json"]),
@@ -46,26 +49,26 @@ func demo_post() -> void:
 		'{"title": "hello", "body": "world", "userId": 1}'
 	)
 	if not res.ok:
-		print("error: ", str(res.error))
+		output_overlay.print_with_overlay("error: ", str(res.error))
 		return
-	print("status: ", res.status)
-	print("body:   ", res.text)
+	output_overlay.print_with_overlay("status: ", res.status)
+	output_overlay.print_with_overlay("body:   ", res.text)
 
 
 func demo_not_found() -> void:
-	print("\n--- 404 ---")
+	output_overlay.print_with_overlay("\n--- 404 ---")
 	# Any non-2xx status sets res.ok = false and populates res.error.
 	var res := await C3HTTPRequest.request(
 		"https://jsonplaceholder.typicode.com/todos/9999"
 	)
-	print("ok:     ", res.ok)
-	print("status: ", res.status)
-	print("error:  ", str(res.error))
-	print("body:   ", res.text)
+	output_overlay.print_with_overlay("ok:     ", res.ok)
+	output_overlay.print_with_overlay("status: ", res.status)
+	output_overlay.print_with_overlay("error:  ", str(res.error))
+	output_overlay.print_with_overlay("body:   ", res.text)
 
 
 func demo_timeout() -> void:
-	print("\n--- Timeout ---")
+	output_overlay.print_with_overlay("\n--- Timeout ---")
 	# timeout lives in Options, so it is per-call and never leaks to others.
 	var opts := C3HTTPRequest.Options.new()
 	opts.timeout = 0.001  # 1 ms — fires before any real response arrives
@@ -76,12 +79,12 @@ func demo_timeout() -> void:
 		"",
 		opts
 	)
-	print("ok:    ", res.ok)
-	print("error: ", str(res.error))
+	output_overlay.print_with_overlay("ok:    ", res.ok)
+	output_overlay.print_with_overlay("error: ", str(res.error))
 
 
 func demo_body_size_limit() -> void:
-	print("\n--- Body size limit ---")
+	output_overlay.print_with_overlay("\n--- Body size limit ---")
 	var opts := C3HTTPRequest.Options.new()
 	opts.body_size_limit = 1000  # /posts returns ~27 KB
 	var res := await C3HTTPRequest.request(
@@ -91,12 +94,12 @@ func demo_body_size_limit() -> void:
 		"",
 		opts
 	)
-	print("ok:    ", res.ok)
-	print("error: ", str(res.error))
+	output_overlay.print_with_overlay("ok:    ", res.ok)
+	output_overlay.print_with_overlay("error: ", str(res.error))
 
 
 func demo_redirect_limit() -> void:
-	print("\n--- Redirect limit ---")
+	output_overlay.print_with_overlay("\n--- Redirect limit ---")
 	# httpbin's /redirect/5 issues a 5-hop chain of 302s. With a budget of 2 we
 	# stop partway and get the next 302 back: ok is false, kind is HTTP, status
 	# is 302, and the message explains the budget was spent.
@@ -109,13 +112,13 @@ func demo_redirect_limit() -> void:
 		"",
 		opts
 	)
-	print("ok:     ", res.ok)
-	print("status: ", res.status)
-	print("error:  ", str(res.error))
+	output_overlay.print_with_overlay("ok:     ", res.ok)
+	output_overlay.print_with_overlay("status: ", res.status)
+	output_overlay.print_with_overlay("error:  ", str(res.error))
 
 
 func demo_download_file() -> void:
-	print("\n--- Download to file ---")
+	output_overlay.print_with_overlay("\n--- Download to file ---")
 	var path := "user://c3_demo_download.json"
 	var opts := C3HTTPRequest.Options.new()
 	opts.download_file = path
@@ -127,15 +130,15 @@ func demo_download_file() -> void:
 		opts
 	)
 	if not res.ok:
-		print("error: ", str(res.error))
+		output_overlay.print_with_overlay("error: ", str(res.error))
 		return
 	# res.body is empty when download_file is set — data went straight to disk.
-	print("res.body empty: ", res.body.is_empty())
-	print("file:           ", FileAccess.get_file_as_string(path).strip_edges())
+	output_overlay.print_with_overlay("res.body empty: ", res.body.is_empty())
+	output_overlay.print_with_overlay("file:           ", FileAccess.get_file_as_string(path).strip_edges())
 
 
 func demo_progress() -> void:
-	print("\n--- Download progress ---")
+	output_overlay.print_with_overlay("\n--- Download progress ---")
 	# httpbin returns a 100 KB body with a Content-Length, so total_bytes is
 	# known and a percentage can be shown. A small download_chunk_size makes the
 	# body arrive in several reads, so on_progress fires multiple times.
@@ -147,12 +150,12 @@ func demo_progress() -> void:
 	opts.on_progress = func(bytes_received: int, total_bytes: int) -> void:
 		if total_bytes > 0:
 			var percent := int(float(bytes_received) / total_bytes * 100.0)
-			print("progress: %d / %d bytes (%d%%)" % [
+			output_overlay.print_with_overlay("progress: %d / %d bytes (%d%%)" % [
 				bytes_received, total_bytes, percent
 			])
 		else:
 			# Chunked responses have no Content-Length, so total_bytes is -1.
-			print("progress: %d bytes (total unknown)" % bytes_received)
+			output_overlay.print_with_overlay("progress: %d bytes (total unknown)" % bytes_received)
 	var res := await C3HTTPRequest.request(
 		"https://httpbin.org/bytes/102400",
 		PackedStringArray(),
@@ -161,20 +164,20 @@ func demo_progress() -> void:
 		opts
 	)
 	if not res.ok:
-		print("error: ", str(res.error))
+		output_overlay.print_with_overlay("error: ", str(res.error))
 		return
-	print("status:     ", res.status)
-	print("downloaded: ", res.body.size(), " bytes")
+	output_overlay.print_with_overlay("status:     ", res.status)
+	output_overlay.print_with_overlay("downloaded: ", res.body.size(), " bytes")
 
 
 func demo_status() -> void:
-	print("\n--- Connection status ---")
+	output_overlay.print_with_overlay("\n--- Connection status ---")
 	# on_status_changed fires as the underlying HTTPClient advances through its
 	# lifecycle — resolving, connecting, requesting, then reading the body. It is
 	# observational only; the request's outcome still arrives via the Response.
 	var opts := C3HTTPRequest.Options.new()
 	opts.on_status_changed = func(status: HTTPClient.Status) -> void:
-		print("status: ", _status_name(status))
+		output_overlay.print_with_overlay("status: ", _status_name(status))
 	var res := await C3HTTPRequest.request(
 		"https://jsonplaceholder.typicode.com/todos/1",
 		PackedStringArray(),
@@ -182,12 +185,12 @@ func demo_status() -> void:
 		"",
 		opts
 	)
-	print("ok:     ", res.ok)
-	print("status: ", res.status)
+	output_overlay.print_with_overlay("ok:     ", res.ok)
+	output_overlay.print_with_overlay("status: ", res.status)
 
 
 func demo_cancellation() -> void:
-	print("\n--- Cancellation ---")
+	output_overlay.print_with_overlay("\n--- Cancellation ---")
 	var token := C3HTTPRequest.CancellationToken.new()
 	var opts := C3HTTPRequest.Options.new()
 	opts.cancellation_token = token
@@ -202,18 +205,18 @@ func demo_cancellation() -> void:
 		"",
 		opts
 	)
-	print("ok:    ", res.ok)
-	print("error: ", str(res.error))
+	output_overlay.print_with_overlay("ok:    ", res.ok)
+	output_overlay.print_with_overlay("error: ", str(res.error))
 
 
 func demo_sse() -> void:
-	print("\n--- Server-Sent Events ---")
+	output_overlay.print_with_overlay("\n--- Server-Sent Events ---")
 	# Wikimedia EventStreams is a real, public, never-ending SSE feed of recent
 	# wiki edits (https://stream.wikimedia.org). Setting Options.on_sse_event parses
 	# the response as a stream and fires the callback per event; the await below
 	# resolves only once the stream closes. Since the feed never ends, we cancel
-	# the token from inside the callback after a few events — the same mechanism
-	# used to tear down any long-lived stream.
+	# the token from inside the callback after SSE_EVENT_COUNT events — the same
+	# mechanism used to tear down any long-lived stream.
 	var token := C3HTTPRequest.CancellationToken.new()
 	var opts := C3HTTPRequest.Options.new()
 	opts.cancellation_token = token
@@ -226,8 +229,8 @@ func demo_sse() -> void:
 		var parsed: Variant = JSON.parse_string(data)
 		if parsed is Dictionary:
 			title = str(parsed.get("title", "?"))
-		print("event %d [%s]: %s" % [counter[0], event_type, title])
-		if counter[0] >= 3:
+		output_overlay.print_with_overlay("event %d [%s]: %s" % [counter[0], event_type, title])
+		if counter[0] >= SSE_EVENT_COUNT:
 			token.cancel()
 	var res := await C3HTTPRequest.request(
 		"https://stream.wikimedia.org/v2/stream/recentchange",
@@ -238,9 +241,9 @@ func demo_sse() -> void:
 	)
 	# Cancelling is how we chose to end the stream, so ok is false with a
 	# CANCELLED error here — that is the expected, successful outcome.
-	print("received: ", counter[0], " events")
-	print("ended ok: ", res.ok)
-	print("error:    ", str(res.error))
+	output_overlay.print_with_overlay("received: ", counter[0], " events")
+	output_overlay.print_with_overlay("ended ok: ", res.ok)
+	output_overlay.print_with_overlay("error:    ", str(res.error))
 
 
 func _status_name(status: HTTPClient.Status) -> String:

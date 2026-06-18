@@ -1,7 +1,7 @@
-[gd_scene load_steps=5 format=3 uid="uid://drmnky0stage1"]
+[gd_scene format=3 uid="uid://drmnky0stage1"]
 
-[ext_resource type="Script" path="res://examples/shared/rotating_monkey.gd" id="1"]
-[ext_resource type="PackedScene" uid="uid://bf7rcp1yln3qg" path="res://examples/shared/Monkey.glb" id="2"]
+[ext_resource type="Script" uid="uid://c0vlknilheicf" path="res://examples/shared/rotating_monkey/rotating_monkey.gd" id="1"]
+[ext_resource type="PackedScene" uid="uid://bf7rcp1yln3qg" path="res://examples/shared/rotating_monkey/Monkey.glb" id="2"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_yyf07"]
 sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)

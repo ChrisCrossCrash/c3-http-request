@@ -1,7 +1,8 @@
 [gd_scene format=3 uid="uid://b5686o5gufm65"]
 
 [ext_resource type="Script" uid="uid://bofnktp4xnds5" path="res://examples/benchmark/benchmark.gd" id="1"]
-[ext_resource type="PackedScene" uid="uid://drmnky0stage1" path="res://examples/shared/rotating_monkey.tscn" id="2"]
+[ext_resource type="PackedScene" uid="uid://drmnky0stage1" path="res://examples/shared/rotating_monkey/rotating_monkey.tscn" id="2"]
+[ext_resource type="PackedScene" uid="uid://slr7er2cdtbm" path="res://examples/shared/output_overlay/output_overlay.tscn" id="3_okoa5"]
 
 [node name="Benchmark" type="Node" unique_id=1095347223]
 script = ExtResource("1")
@@ -11,12 +12,21 @@ script = ExtResource("1")
 [node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=1285066232]
 
 [node name="FPSLabel" type="Label" parent="CanvasLayer" unique_id=2030974027]
-offset_right = 40.0
+offset_left = 6.0
+offset_right = 47.0
 offset_bottom = 23.0
 text = "0 FPS"
 
 [node name="StatusLabel" type="RichTextLabel" parent="CanvasLayer" unique_id=1802720161]
+offset_left = 6.0
 offset_top = 21.0
-offset_right = 786.0
+offset_right = 792.0
 offset_bottom = 109.56338
 text = "Benchmark: not running"
+
+[node name="OutputOverlay" parent="CanvasLayer" unique_id=1632807613 instance=ExtResource("3_okoa5")]
+custom_minimum_size = Vector2(30, 30)
+offset_left = 6.0
+offset_top = 95.0
+offset_right = -7.0
+offset_bottom = -4.0

@@ -1,0 +1,37 @@
+[gd_scene format=3 uid="uid://slr7er2cdtbm"]
+
+[ext_resource type="FontFile" uid="uid://cfwdsep81ab2w" path="res://examples/shared/fonts/JetBrainsMono-Regular.ttf" id="1_vdfip"]
+[ext_resource type="Script" uid="uid://dsootcsli3ry5" path="res://examples/shared/output_overlay/output_overlay.gd" id="1_w6puq"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_vdfip"]
+content_margin_left = 8.0
+content_margin_top = 8.0
+content_margin_right = 8.0
+content_margin_bottom = 8.0
+bg_color = Color(0, 0, 0, 0.6666667)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0, 0, 0, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[node name="OutputOverlay" type="RichTextLabel" unique_id=1632807613]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+focus_mode = 2
+theme_override_fonts/normal_font = ExtResource("1_vdfip")
+theme_override_fonts/bold_font = ExtResource("1_vdfip")
+theme_override_fonts/mono_font = ExtResource("1_vdfip")
+theme_override_styles/normal = SubResource("StyleBoxFlat_vdfip")
+scroll_following = true
+selection_enabled = true
+script = ExtResource("1_w6puq")
