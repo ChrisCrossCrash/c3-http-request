@@ -243,3 +243,22 @@ func _on_body_entered(body: Node3D) -> void:
 	if body is RigidBody3D and state == SlotState.EMPTY:
 		_highlight_mesh.visible = true
 ```
+
+## Releasing
+
+Releases are tag-driven. Pushing a `v*` tag triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which runs the test suite, builds the asset zip, and publishes a GitHub Release with the zip attached and notes taken from the changelog.
+
+The single source of truth for the version is `const VERSION` in [`c3_http_request/c3_http_request.gd`](c3_http_request/c3_http_request.gd). [`scripts/build_asset.py`](scripts/build_asset.py) refuses to build unless the tag matches it exactly, so the bump and the tag can never drift.
+
+To cut a release (e.g. `v0.2.0`):
+
+1. Update `const VERSION` in [`c3_http_request/c3_http_request.gd`](c3_http_request/c3_http_request.gd).
+2. Add a section for the version to [`CHANGELOG.md`](CHANGELOG.md), following the [Keep a Changelog](https://keepachangelog.com/) format already in the file. The release workflow publishes this section verbatim as the GitHub Release body, so write it for release-notes readers — and call out breaking changes with a migration note.
+3. Verify locally before tagging:
+    - Run the full test suite (see [Running Tests](#running-tests)).
+    - Dry-run the build: `python scripts/build_asset.py v0.2.0` (confirms the tag/`VERSION` check passes and produces `build/c3_http_request_v0.2.0.zip`).
+    - Preview the release body: `python scripts/extract_changelog.py v0.2.0` (prints the changelog section the workflow will publish).
+4. Commit the version bump and changelog to `main`.
+5. Create an annotated tag matching `VERSION` and push it: `git tag -a v0.2.0` then `git push origin main v0.2.0`. The push triggers the release workflow.
+6. After the workflow succeeds, update the [Godot Asset Store](https://store.godotengine.org/asset/c3designs/c3-http-request/manage/) by uploading the new release bundle.
+7. After the release is approved, update the detailed description for the asset to match the latest version's features and changes.
