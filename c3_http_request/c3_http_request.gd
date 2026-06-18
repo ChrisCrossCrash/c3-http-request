@@ -317,10 +317,10 @@ class _Impl:
 		custom_headers: PackedStringArray,
 		method: int,
 		request_data: Variant,
-		options: C3HTTPRequest.Options,
+		options: Options,
 		_redirects_left: int = -1,
 		_on_worker: bool = false
-	) -> C3HTTPRequest.Response:
+	) -> Response:
 		# options.use_threads is read exactly once — here — to decide whether to
 		# spawn a worker. Every downstream poll and dispatch decision uses _on_worker
 		# instead, so the fallback path (threads requested but unavailable) behaves
@@ -331,7 +331,7 @@ class _Impl:
 			)
 
 		if _cancelled(options):
-			return _fail(C3HTTPRequest.RequestError.cancelled("Request was cancelled."))
+			return _fail(RequestError.cancelled("Request was cancelled."))
 		var redirects_left := (
 			options.max_redirects if _redirects_left < 0 else _redirects_left
 		)
@@ -340,7 +340,7 @@ class _Impl:
 
 		var parsed := _parse_url(url)
 		if parsed.is_empty():
-			return _fail(C3HTTPRequest.RequestError.client_error(
+			return _fail(RequestError.client_error(
 					'Invalid URL: "%s".' % url
 			))
 
@@ -348,7 +348,7 @@ class _Impl:
 		if not options.download_file.is_empty() and not streaming:
 			file = FileAccess.open(options.download_file, FileAccess.WRITE)
 			if file == null:
-				return _fail(C3HTTPRequest.RequestError.client_error(
+				return _fail(RequestError.client_error(
 					"Cannot open download file: \"%s\"." % options.download_file
 				))
 
@@ -376,7 +376,7 @@ class _Impl:
 		else:
 			err = client.connect_to_host(parsed["host"], parsed["port"])
 		if err != OK:
-			return _fail(C3HTTPRequest.RequestError.transport(
+			return _fail(RequestError.transport(
 				"Failed to start connection (error %d)." % err
 			))
 
@@ -392,17 +392,17 @@ class _Impl:
 			]:
 				break
 			if _timed_out(start_ms, options.timeout):
-				return _fail(C3HTTPRequest.RequestError.timed_out(
+				return _fail(RequestError.timed_out(
 					"Timed out while connecting."
 				))
 			if _cancelled(options):
-				return _fail(C3HTTPRequest.RequestError.cancelled(
+				return _fail(RequestError.cancelled(
 						"Request was cancelled."
 				))
 			await _pump(tree, _on_worker)
 
 		if client.get_status() != HTTPClient.STATUS_CONNECTED:
-			return _fail(C3HTTPRequest.RequestError.transport(
+			return _fail(RequestError.transport(
 				"Could not connect (status %d)." % client.get_status()
 			))
 
@@ -415,7 +415,7 @@ class _Impl:
 				method, parsed["path"], all_headers, request_data
 			)
 		if err != OK:
-			return _fail(C3HTTPRequest.RequestError.transport(
+			return _fail(RequestError.transport(
 				"Failed to send request (error %d)." % err
 			))
 
@@ -425,17 +425,17 @@ class _Impl:
 			if client.get_status() != HTTPClient.STATUS_REQUESTING:
 				break
 			if _timed_out(start_ms, options.timeout):
-				return _fail(C3HTTPRequest.RequestError.timed_out(
+				return _fail(RequestError.timed_out(
 					"Timed out waiting for response."
 				))
 			if _cancelled(options):
-				return _fail(C3HTTPRequest.RequestError.cancelled(
+				return _fail(RequestError.cancelled(
 					"Request was cancelled."
 				))
 			await _pump(tree, _on_worker)
 
 		if not client.has_response():
-			return _fail(C3HTTPRequest.RequestError.transport(
+			return _fail(RequestError.transport(
 				"No response received."
 			))
 
@@ -463,14 +463,14 @@ class _Impl:
 			if _timed_out(last_recv_ms if sse_mode else start_ms, options.timeout):
 				if file != null:
 					file.close()
-				return _fail(C3HTTPRequest.RequestError.timed_out(
+				return _fail(RequestError.timed_out(
 					"Stream idle for too long." if sse_mode
 					else "Timed out while reading body."
 				))
 			if _cancelled(options):
 				if file != null:
 					file.close()
-				return _fail(C3HTTPRequest.RequestError.cancelled(
+				return _fail(RequestError.cancelled(
 					"Request was cancelled."
 				))
 			client.poll()
@@ -487,7 +487,7 @@ class _Impl:
 					options.body_size_limit >= 0
 					and sse_buffer.size() + chunk.size() > options.body_size_limit
 				):
-					return _fail(C3HTTPRequest.RequestError.body_size_limit_exceeded(
+					return _fail(RequestError.body_size_limit_exceeded(
 						"SSE event exceeded limit of %d bytes."
 						% options.body_size_limit
 					))
@@ -500,7 +500,7 @@ class _Impl:
 			):
 				if file != null:
 					file.close()
-				return _fail(C3HTTPRequest.RequestError.body_size_limit_exceeded(
+				return _fail(RequestError.body_size_limit_exceeded(
 					"Response body exceeded limit of %d bytes."
 					% options.body_size_limit
 				))
@@ -552,14 +552,14 @@ class _Impl:
 					_on_worker
 				)
 
-		var res := C3HTTPRequest.Response.new()
+		var res := Response.new()
 		res.status = status
 		res.headers = resp_headers
 		res.body = body_bytes if file == null else PackedByteArray()
 		if status < 200 or status >= 300:
 			res.ok = false
-			var e := C3HTTPRequest.RequestError.new()
-			e.kind = C3HTTPRequest.RequestError.Kind.HTTP
+			var e := RequestError.new()
+			e.kind = RequestError.Kind.HTTP
 			e.status = status
 			# A 3xx carrying a Location that we stopped following only because the
 			# redirect budget is spent. Say so, otherwise the bare status reads
@@ -595,9 +595,9 @@ class _Impl:
 		custom_headers: PackedStringArray,
 		method: int,
 		request_data: Variant,
-		options: C3HTTPRequest.Options,
+		options: Options,
 		redirects_left: int
-	) -> C3HTTPRequest.Response:
+	) -> Response:
 		var tree := Engine.get_main_loop() as SceneTree
 		# Marshaled callbacks are dispatched with call_deferred from the worker, so
 		# they run on the main thread at the next message-queue flush. We must drain
@@ -610,7 +610,7 @@ class _Impl:
 		)
 		var thread := Thread.new()
 		thread.start(
-			func() -> C3HTTPRequest.Response:
+			func() -> Response:
 				return await execute(
 					url, custom_headers, method, request_data, options,
 					redirects_left, true
@@ -625,11 +625,11 @@ class _Impl:
 		# adds an await that actually suspends, the function returns a coroutine
 		# state instead — fail loudly here rather than corrupting the result.
 		assert(
-			result is C3HTTPRequest.Response,
+			result is Response,
 			"C3HTTPRequest: threaded worker suspended; the worker path must run "
 			+ "synchronously (see _pump). Did a new await get added to execute()?"
 		)
-		var res: C3HTTPRequest.Response = result
+		var res: Response = result
 		if has_observers:
 			# One more frame guarantees a message-queue flush after the worker has
 			# returned, so all deferred callbacks fire before this Response resolves.
@@ -717,7 +717,7 @@ class _Impl:
 			return false
 		return (Time.get_ticks_msec() - start_ms) / 1000.0 >= timeout
 
-	func _cancelled(options: C3HTTPRequest.Options) -> bool:
+	func _cancelled(options: Options) -> bool:
 		return (
 			options.cancellation_token != null
 			and options.cancellation_token.is_cancelled()
@@ -728,7 +728,7 @@ class _Impl:
 	func _emit_status_change(
 		client: HTTPClient,
 		last_status: HTTPClient.Status,
-		options: C3HTTPRequest.Options,
+		options: Options,
 		on_worker: bool
 	) -> HTTPClient.Status:
 		var current := client.get_status()
@@ -854,8 +854,8 @@ class _Impl:
 			return
 		on_event.call("\n".join(data_lines), event_type)
 
-	func _fail(error: C3HTTPRequest.RequestError) -> C3HTTPRequest.Response:
-		var res := C3HTTPRequest.Response.new()
+	func _fail(error: RequestError) -> Response:
+		var res := Response.new()
 		res.ok = false
 		res.error = error
 		return res
