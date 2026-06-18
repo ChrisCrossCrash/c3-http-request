@@ -1,6 +1,10 @@
 # C3HTTPRequest Benchmark
 
-Comparison of `C3HTTPRequest` against Godot's native `HTTPRequest` node across three scenarios: single-request latency, concurrent request throughput, and large file downloads. Each scenario tests both **cooperative** (per-frame, non-threaded) and **threaded** (OS-speed) polling modes.
+Comparison of `C3HTTPRequest` against Godot's native `HTTPRequest` node across three scenarios: single-request latency, concurrent request throughput, and large file downloads.
+
+Both clients are built on the same transport: Godot's `HTTPClient`, a non-blocking state machine you drive by calling `poll()` repeatedly to advance it through its stages — resolving the host, connecting, sending the request, then reading the response body one chunk at a time. Neither client blocks a thread waiting on the network; instead each runs a **polling loop** that calls `poll()` over and over until the response is complete. Perhaps the most important design consideration regarding speed for each client is _how often, and on which thread, that loop gets to run._
+
+Each scenario tests two polling modes. In **cooperative** mode (the default for both clients), the polling loop yields back to the scene tree whenever it has to wait, resuming on the next frame — so the frame rate bounds how often it can resume to make progress. How much work each client does within a single resume varies, and that is exactly where the two differ on downloads, below. This cadence ties timing to the frame rate throughout, so the latency scenario varies the frame cap directly (uncapped, 120, 60, and 30 fps) to isolate its effect. In **threaded** mode, the request runs on a background thread that polls at OS speed, decoupling it from the frame rate entirely. Each client opts in through its own setting: `Options.use_threads = true` for C3HTTPRequest, and the native node's own `use_threads` property for `HTTPRequest`. The four-column tables below report both modes for each client side by side.
 
 **Test environment:**
 
@@ -13,7 +17,7 @@ Comparison of `C3HTTPRequest` against Godot's native `HTTPRequest` node across t
 | Benchmark script | [`examples/benchmark/`](examples/benchmark/)                                                                                                                                                                                |
 | Run command      | `godot --path . --no-debug examples/benchmark/benchmark.tscn`                                                                                                                                                               |
 
-All results are medians to reduce sensitivity to GC pauses and scheduler jitter. The client machine was in Minneapolis, MN; the server in Virginia (AWS us-east-1), roughly 1,300 miles away.
+All results are medians, so a request occasionally slowed by system noise doesn't skew the numbers. The client machine was in Minneapolis, MN; the server in Virginia (AWS us-east-1), roughly 1,300 miles away.
 
 ---
 
@@ -27,14 +31,14 @@ All results are medians to reduce sensitivity to GC pauses and scheduler jitter.
 
 | Frame rate | C3 cooperative | C3 threaded | native cooperative | native threaded |
 | ---------- | -------------- | ----------- | ------------------ | --------------- |
-| uncapped   | 164.82 ms      | 167.09 ms   | 165.66 ms          | 166.61 ms       |
-| 120 fps    | 174.95 ms      | 174.85 ms   | 183.32 ms          | 174.88 ms       |
-| 60 fps     | 183.29 ms      | 183.16 ms   | 199.98 ms          | 183.19 ms       |
-| 30 fps     | 199.97 ms      | 199.82 ms   | 233.32 ms          | 199.82 ms       |
+| uncapped   | 165.82 ms      | 168.58 ms   | 168.48 ms          | 171.57 ms       |
+| 120 fps    | 174.97 ms      | 174.88 ms   | 183.32 ms          | 174.90 ms       |
+| 60 fps     | 183.30 ms      | 183.20 ms   | 199.98 ms          | 183.21 ms       |
+| 30 fps     | 199.97 ms      | 199.86 ms   | 233.32 ms          | 199.85 ms       |
 
 ### Analysis
 
-**The baseline is ~165–167 ms.** Running uncapped or in threaded mode removes all per-frame polling overhead, leaving just the network round-trip time. Both clients hit the same ~165–167 ms floor — confirming this is a network constant, not a code difference.
+**The baseline is ~166–172 ms.** Running uncapped or in threaded mode removes all per-frame polling overhead, leaving just the network round-trip time. Both clients land in the same ~166–172 ms band — confirming this is a network constant, not a code difference.
 
 **In cooperative mode, C3HTTPRequest resolves ~1 frame sooner than native.** Each frame adds one cooperative poll. The difference between C3 and native at each capped rate matches almost exactly one additional frame period:
 
@@ -71,18 +75,18 @@ For native `HTTPRequest`, N nodes are created (required, since each node handles
 
 | N   | C3 cooperative | native cooperative | C3 threaded | native threaded |
 | --- | -------------- | ------------------ | ----------- | --------------- |
-| 1   | 183.36 ms      | 216.56 ms          | 183.11 ms   | 183.28 ms       |
-| 2   | 183.46 ms      | 216.52 ms          | 183.11 ms   | 183.30 ms       |
-| 4   | 200.26 ms      | 233.15 ms          | 199.55 ms   | 199.95 ms       |
-| 8   | 233.25 ms      | 266.40 ms          | 216.47 ms   | 216.74 ms       |
+| 1   | 183.36 ms      | 216.57 ms          | 183.10 ms   | 183.29 ms       |
+| 2   | 183.43 ms      | 216.54 ms          | 183.12 ms   | 183.31 ms       |
+| 4   | 200.19 ms      | 233.19 ms          | 199.71 ms   | 199.96 ms       |
+| 8   | 233.35 ms      | 266.48 ms          | 232.73 ms   | 217.23 ms       |
 
 ### Analysis
 
-**C3HTTPRequest scales smoothly.** Wall-clock time grows modestly as concurrency rises: an extra ~16–33 ms per doubling (roughly one frame per additional serialized poll round). The threaded variant is nearly identical to cooperative at low concurrency and becomes about one frame faster at higher concurrency (N=8).
+**C3HTTPRequest scales smoothly.** Wall-clock time grows modestly as concurrency rises: an extra ~16–33 ms per doubling (roughly one frame per additional serialized poll round). For C3 the threaded and cooperative variants are nearly identical at every level — its cooperative loop already advances all ready coroutines within a single frame, so polling at OS speed buys almost nothing here.
 
-**Native cooperative scales acceptably.** The same modest growth pattern applies — native cooperative is consistently ~1 frame slower than C3 cooperative at each level, matching the single-request result.
+**Native cooperative trails by ~2 frames.** The same modest growth pattern applies, but native cooperative sits a steady ~33 ms (two 60 fps frames) behind C3 cooperative at every level — one frame more than the single-request gap. The extra frame is node lifecycle overhead in the concurrent harness (each request needs its own `HTTPRequest` node added to the tree), not a difference in the transfer itself.
 
-**Threaded mode converges with cooperative at higher concurrency.** At higher concurrency, the per-frame polling delay becomes a smaller contributor relative to scheduling overhead and network variance, making the two models more comparable overall.
+**Threaded mode closes the native gap.** Removing the per-frame polls drops native threaded to roughly C3's level. At N=8 native threaded (217 ms) even edges about one frame ahead of C3 (233 ms): each native request runs on its own dedicated node and thread, whereas C3's gains here are limited by its already-efficient cooperative draining. In short, at high concurrency the two threaded clients land within a frame of each other.
 
 ---
 
@@ -96,8 +100,8 @@ Stream a body to disk using a 64 KB chunk size (`Options.download_chunk_size`). 
 
 | Body size | C3 cooperative | C3 threaded | native cooperative | native threaded |
 | --------- | -------------- | ----------- | ------------------ | --------------- |
-| 1 MB      | 350.03 ms      | 349.38 ms   | 500.17 ms          | 349.64 ms       |
-| 8 MB      | 600.17 ms      | 595.74 ms   | 2366.74 ms         | 599.80 ms       |
+| 1 MB      | 350.23 ms      | 349.66 ms   | 500.12 ms          | 349.81 ms       |
+| 8 MB      | 617.65 ms      | 594.54 ms   | 2366.71 ms         | 616.41 ms       |
 
 ### Analysis
 
@@ -128,7 +132,7 @@ The slowness was first reported in 2019 as [godot#32807](https://github.com/godo
 
 **C3HTTPRequest drains all available chunks per frame in cooperative mode.** For small bodies that arrive within a single frame's worth of network data, there's no difference. For larger bodies (8 MB), C3HTTPRequest reads everything the connection delivers each frame, so time tracks bandwidth rather than polling cadence — about 4× faster at 60 fps for an 8 MB body.
 
-**Threaded mode equalizes both clients.** With `use_threads = true`, both poll at OS speed and deliver the full link bandwidth. The small difference between C3 (596 ms) and native (600 ms) for 8 MB is within the noise of 25 repetitions over a remote connection.
+**Threaded mode equalizes both clients.** With `use_threads = true`, both poll at OS speed and deliver the full link bandwidth. The small difference between C3 (595 ms) and native (616 ms) for 8 MB is within the noise of 25 repetitions over a remote connection.
 
 A side effect worth noting: when V-Sync is enabled the frame rate locks to the monitor's refresh rate, so download throughput is directly proportional to it — a 144 Hz monitor yields a ~9.44 MB/s ceiling and a 240 Hz monitor ~15.73 MB/s. In other words, **upgrading your monitor makes your downloads faster with the native `HTTPRequest` for cooperative (i.e., non-threaded) downloads**. `C3HTTPRequest` has no such ceiling because it drains all available chunks per frame, so its throughput is bottlenecked by the actual connection speed rather than the frame rate.
 
@@ -142,7 +146,7 @@ The cooperative advantage depends on body size relative to what the connection c
 | --------------------------------- | ---------------------------------- | ----------------------------------- |
 | Latency (cooperative)             | ~1 frame sooner at any capped rate | baseline                            |
 | Latency (threaded)                | equal (RTT-limited)                | equal (RTT-limited)                 |
-| Concurrent requests (cooperative) | smooth scaling                     | ~1 frame slower, otherwise smooth   |
+| Concurrent requests (cooperative) | smooth scaling                     | ~2 frames slower, otherwise smooth  |
 | 8 MB download (cooperative)       | ~4× faster                         | frame-rate-gated throughput ceiling |
 | 8 MB download (threaded)          | equal                              | equal                               |
 
@@ -157,43 +161,44 @@ Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
 Vulkan 1.4.341 - Forward+ - Using Device #0: NVIDIA - NVIDIA GeForce RTX 4070
 
 C3HTTPRequest benchmark vs native HTTPRequest
+commit a22941c
 Godot 4.6.2-stable (official) | Windows | AMD Ryzen 5 7600 6-Core Processor | forward_plus renderer
 
 == Single-request latency (median of 100 requests) ==
 
 uncapped             cooperative   threaded
-C3HTTPRequest:         164.82 ms    167.09 ms
-native HTTPRequest:    165.66 ms    166.61 ms
+C3HTTPRequest:         165.82 ms    168.58 ms
+native HTTPRequest:    168.48 ms    171.57 ms
 
 120 fps              cooperative   threaded
-C3HTTPRequest:         174.95 ms    174.85 ms
-native HTTPRequest:    183.32 ms    174.88 ms
+C3HTTPRequest:         174.97 ms    174.88 ms
+native HTTPRequest:    183.32 ms    174.90 ms
 
 60 fps               cooperative   threaded
-C3HTTPRequest:         183.29 ms    183.16 ms
-native HTTPRequest:    199.98 ms    183.19 ms
+C3HTTPRequest:         183.30 ms    183.20 ms
+native HTTPRequest:    199.98 ms    183.21 ms
 
 30 fps               cooperative   threaded
-C3HTTPRequest:         199.97 ms    199.82 ms
-native HTTPRequest:    233.32 ms    199.82 ms
+C3HTTPRequest:         199.97 ms    199.86 ms
+native HTTPRequest:    233.32 ms    199.85 ms
 
 == Concurrency: wall-clock to complete N simultaneous requests (median of 25 batches, 60 fps) ==
     N   C3 coop      nat coop     C3 thread    nat thread
-    1     183.36 ms     216.56 ms     183.11 ms     183.28 ms
-    2     183.46 ms     216.52 ms     183.11 ms     183.30 ms
-    4     200.26 ms     233.15 ms     199.55 ms     199.95 ms
-    8     233.25 ms     266.40 ms     216.47 ms     216.74 ms
+    1     183.36 ms     216.57 ms     183.10 ms     183.29 ms
+    2     183.43 ms     216.54 ms     183.12 ms     183.31 ms
+    4     200.19 ms     233.19 ms     199.71 ms     199.96 ms
+    8     233.35 ms     266.48 ms     232.73 ms     217.23 ms
 
 == File download to disk (median of 25 runs, 60 fps) ==
 Target: https://api.chriskumm.com/api/benchmark/download/1048576/
 
 1 MB                 cooperative   threaded
-C3HTTPRequest:         350.03 ms    349.38 ms
-native HTTPRequest:    500.17 ms    349.64 ms
+C3HTTPRequest:         350.23 ms    349.66 ms
+native HTTPRequest:    500.12 ms    349.81 ms
 
 8 MB                 cooperative   threaded
-C3HTTPRequest:         600.17 ms    595.74 ms
-native HTTPRequest:   2366.74 ms    599.80 ms
+C3HTTPRequest:         617.65 ms    594.54 ms
+native HTTPRequest:   2366.71 ms    616.41 ms
 
 Done.
 ```
