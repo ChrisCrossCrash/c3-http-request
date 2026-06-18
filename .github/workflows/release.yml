@@ -41,8 +41,11 @@ jobs:
       - name: Build asset zip
         run: python scripts/build_asset.py ${{ github.ref_name }}
 
+      - name: Extract release notes from CHANGELOG
+        run: python scripts/extract_changelog.py ${{ github.ref_name }} > release_notes.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: build/c3_http_request_${{ github.ref_name }}.zip
-          generate_release_notes: true
+          body_path: release_notes.md
