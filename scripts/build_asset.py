@@ -10,6 +10,7 @@ REPO_ROOT = Path(__file__).parent.parent
 ASSET_DIR = REPO_ROOT / "c3_http_request"
 SCRIPT_FILE = ASSET_DIR / "c3_http_request.gd"
 LICENSE_FILE = REPO_ROOT / "LICENSE.md"
+README_FILE = REPO_ROOT / "README.md"
 OUTPUT_DIR = REPO_ROOT / "build"
 
 
@@ -43,6 +44,7 @@ def build(version: str):
                 zf.write(file, target_dir / file.relative_to(ASSET_DIR))
 
         zf.write(LICENSE_FILE, target_dir / LICENSE_FILE.name)
+        zf.write(README_FILE, target_dir / README_FILE.name)
 
     print(f"Built: {output_zip}")
 
