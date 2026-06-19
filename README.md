@@ -4,33 +4,7 @@ _Like `HTTPRequest`, but better!_
 
 `C3HTTPRequest` is a lightweight, async HTTP client for Godot 4 that covers nearly everything `HTTPRequest` does — and gets out of your way while doing it. There's no `Node` to instantiate, add to the tree, and free; no `request_completed` signal to connect; and no two-step "did the transfer work, _and_ was the status 2xx?" dance. You `await` a single static call and check one field.
 
-Here's the same GET request both ways:
-
-<table>
-<tr><th><code>HTTPRequest</code></th><th><code>C3HTTPRequest</code></th></tr>
-<tr valign="top"><td>
-
-```gdscript
-var http := HTTPRequest.new()
-add_child(http)
-http.request("https://api.example.com/todos/1")
-var result: Array = await http.request_completed
-http.queue_free()
-
-var code: int = result[0]
-var status: int = result[1]
-var body: PackedByteArray = result[3]
-if code == HTTPRequest.RESULT_SUCCESS and status == 200:
-    var text := body.get_string_from_utf8()
-    print(text)
-    var data: Variant = JSON.parse_string(text)
-    if data is Dictionary:
-        print(data["title"])
-else:
-    push_error("Request failed")
-```
-
-</td><td>
+Here's a simple GET request with `C3HTTPRequest`:
 
 ```gdscript
 var res := await C3HTTPRequest.request("https://api.example.com/todos/1")
@@ -40,9 +14,6 @@ if res.ok:
 else:
     push_error(str(res.error))
 ```
-
-</td></tr>
-</table>
 
 No node, no signal, no tree — and `res.ok` is a single check that already accounts for transport failures, timeouts, and non-2xx statuses alike. Redirects are followed automatically (up to `Options.max_redirects`), so `res` reflects the final response the chain lands on.
 
