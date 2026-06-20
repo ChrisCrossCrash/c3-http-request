@@ -17,7 +17,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 config/name="C3 HTTP Request for Godot"
 config/description="A lightweight, async HTTP client for Godot 4 that requires no scene tree. Call the static request() method from anywhere — no node to add, no signal to wire."
 run/main_scene="uid://bvwdmvr4471hn"
-config/features=PackedStringArray("4.6", "Forward Plus")
+config/features=PackedStringArray("4.7", "Forward Plus")
 
 [audio]
 
