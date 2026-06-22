@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-06-22
+
+### Added
+
+- Runtime warning when `C3HTTPRequest` is instantiated directly, since it carries no instance state — all calls go through the static `request()` and `request_raw()` methods.
+
+### Fixed
+
+- Custom headers are now forwarded selectively across redirect hops in line with standard HTTP client conventions.
+- The timeout budget now spans the entire redirect chain rather than restarting on each hop. A `timeout` of 5 s with `max_redirects` of 8 now enforces a 5 s total deadline, not up to 45 s across nine independent clocks.
+- The download file is removed when a redirect follow-up fails before the body phase, rather than being left on disk with the redirect response's content.
+- The body-read loop now exits immediately when the client leaves `STATUS_BODY` mid-poll, preventing a stale `read_response_body_chunk` call after the connection closes.
+
 ## [0.3.0] - 2026-06-21
 
 ### Added
@@ -41,6 +54,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Initial release: static, async HTTP client for Godot 4 with no scene-tree requirement. `await C3HTTPRequest.request(...)` and check `response.ok` to cover transport failures, timeouts, and non-2xx statuses with a single check. Per-request `Options` for timeout, body size limit, gzip decompression, redirect control, custom TLS, proxy, and download-to-file; cancellation tokens; and SSE, progress, and status-change callbacks.
 
+[0.3.1]: https://github.com/ChrisCrossCrash/c3-http-request/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/ChrisCrossCrash/c3-http-request/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ChrisCrossCrash/c3-http-request/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/ChrisCrossCrash/c3-http-request/releases/tag/v0.1.0
