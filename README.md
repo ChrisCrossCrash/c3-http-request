@@ -27,7 +27,7 @@ No node, no signal, no tree — and `res.ok` is a single check that already acco
 - Server-Sent Events (SSE) — pass an `on_sse_event` callback to consume a streaming `text/event-stream` response incrementally
 - Download progress — pass an `on_progress` callback to track `(bytes_received, total_bytes)` as the body arrives
 - Connection status — pass an `on_status_changed` callback to observe the `HTTPClient` lifecycle (resolving, connecting, requesting, body)
-- Automatic gzip/deflate decompression when the server sends compressed responses
+- Automatic gzip decompression when the server sends compressed responses
 - Redirect following with a configurable depth limit
 - Optional threaded mode — set `use_threads` to poll on a background thread at OS speed instead of once per frame, with callbacks auto-marshaled back to the main thread
 
@@ -45,7 +45,7 @@ No node, no signal, no tree — and `res.ok` is a single check that already acco
 | Concurrent requests                     |   Unlimited   |         One per node         |
 | Cancellation                            | ✓ Token-based |     ✓ `cancel_request()`     |
 | Timeout                                 |       ✓       |              ✓               |
-| Gzip/deflate decompression              |     ✓ \*      |              ✓               |
+| Gzip decompression                      |       ✓       |              ✓               |
 | Redirect following                      |       ✓       |              ✓               |
 | Download to file                        |       ✓       |              ✓               |
 | Body size limit                         |       ✓       |              ✓               |
@@ -56,8 +56,6 @@ No node, no signal, no tree — and `res.ok` is a single check that already acco
 | Download progress events                |       ✓       |              ✓               |
 | Connection status callback              |       ✓       | ✓ `get_http_client_status()` |
 | Threaded requests (off main loop)       |       ✓       |              ✓               |
-
-<sub>\* When `Options.download_file` is set, the response body is written to disk as-is — decompression is skipped and the file may contain raw compressed bytes.</sub>
 
 ## Benchmarks
 
@@ -140,7 +138,7 @@ var res3 := await C3HTTPRequest.request(url, PackedStringArray(), C3HTTPRequest.
 | `timeout`             | `float`             | `0.0`   | Maximum seconds to wait. `0.0` disables the timeout.                                                                                                                             |
 | `body_size_limit`     | `int`               | `-1`    | Maximum response body size in bytes. `-1` is unlimited.                                                                                                                          |
 | `download_chunk_size` | `int`               | `65536` | Read buffer size in bytes.                                                                                                                                                       |
-| `accept_gzip`         | `bool`              | `true`  | Inject `Accept-Encoding: gzip, deflate` and auto-decompress.                                                                                                                     |
+| `accept_gzip`         | `bool`              | `true`  | Inject `Accept-Encoding: gzip` and auto-decompress. Gzip only — deflate is intentionally unsupported (its raw-vs-zlib ambiguity makes it unreliable).                            |
 | `max_redirects`       | `int`               | `8`     | Maximum redirects to follow. `0` disables following.                                                                                                                             |
 | `use_threads`         | `bool`              | `false` | Run the polling loop on a background thread at OS speed instead of once per frame. Callbacks are auto-marshaled to the main thread. See [Threaded requests](#threaded-requests). |
 | `download_file`       | `String`            | `""`    | Path to stream the body to on disk. Empty keeps the body in memory.                                                                                                              |
@@ -224,7 +222,7 @@ opts.on_progress = func(bytes_received: int, total_bytes: int) -> void:
 var res := await C3HTTPRequest.request("https://example.com/large.bin", PackedStringArray(), C3HTTPRequest.Method.GET, "", opts)
 ```
 
-Works for both in-memory and `download_file` downloads. `bytes_received` counts raw bytes off the wire, so it may differ from the final `res.body.size()` when a gzip/deflate body is decompressed after the transfer completes. It has no effect in SSE mode (`on_sse_event`), where the events themselves are the incremental signal.
+Works for both in-memory and `download_file` downloads. `bytes_received` counts raw bytes off the wire, so it may differ from the final `res.body.size()` when a gzip body is decompressed after the transfer completes. It has no effect in SSE mode (`on_sse_event`), where the events themselves are the incremental signal.
 
 ## Connection status
 

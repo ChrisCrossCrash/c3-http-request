@@ -957,3 +957,505 @@ class TestResolveProxies extends GutTest:
 		var proxies := impl._resolve_proxies(opts)
 		assert_eq(proxies["https"], ["https.proxy.example", 8443])
 		assert_false(proxies.has("http"))
+
+
+## Tests for the streaming download decompressor
+## ([method _Impl._decode_chunk] / [method _Impl._drain_decoder]).
+class TestStreamingDecompression extends GutTest:
+	var impl: C3HTTPRequest._Impl
+
+	func before_each() -> void:
+		impl = C3HTTPRequest._Impl.new()
+
+	# Decodes [param compressed] by feeding it through _decode_chunk in slices of
+	# [param piece] bytes — mirroring the body loop's per-chunk decode. Each chunk
+	# is fully drained on arrival, so the complete output is gathered by the time
+	# the last chunk (carrying the gzip footer) is consumed. Returns {"ok","data"}.
+	func _decode_in_pieces(
+		compressed: PackedByteArray, piece: int
+	) -> Dictionary:
+		var decoder := StreamPeerGZIP.new()
+		decoder.start_decompression(false)  # gzip
+		var out := PackedByteArray()
+		var pos := 0
+		while pos < compressed.size():
+			var end: int = mini(pos + piece, compressed.size())
+			var res := impl._decode_chunk(decoder, compressed.slice(pos, end), 4096)
+			if not res["ok"]:
+				return {"ok": false, "data": out}
+			out.append_array(res["data"])
+			pos = end
+		return {"ok": true, "data": out}
+
+	func test_decode_gzip_single_chunk() -> void:
+		var original := "The quick brown fox.".to_utf8_buffer()
+		var compressed := original.compress(FileAccess.COMPRESSION_GZIP)
+		var result := _decode_in_pieces(compressed, compressed.size())
+		assert_true(result["ok"])
+		assert_eq(result["data"], original)
+
+	func test_decode_gzip_split_across_many_reads() -> void:
+		# A byte-at-a-time feed must reassemble to the same bytes — the decoder
+		# has to buffer state across chunks.
+		var original := (
+			"Streaming decompression across chunk boundaries!".to_utf8_buffer()
+		)
+		var compressed := original.compress(FileAccess.COMPRESSION_GZIP)
+		var result := _decode_in_pieces(compressed, 1)
+		assert_true(result["ok"])
+		assert_eq(result["data"], original)
+
+	func test_decode_empty_input_is_ok_and_empty() -> void:
+		var result := _decode_in_pieces(PackedByteArray(), 4096)
+		assert_true(result["ok"])
+		assert_eq(result["data"], PackedByteArray())
+
+	func test_decode_large_body_round_trips() -> void:
+		# A body well past a single buffer, to exercise multi-slice draining.
+		var text := "C3HTTPRequest streaming gzip. ".repeat(2000)
+		var original := text.to_utf8_buffer()
+		var compressed := original.compress(FileAccess.COMPRESSION_GZIP)
+		var result := _decode_in_pieces(compressed, 512)
+		assert_true(result["ok"])
+		assert_eq(result["data"], original)
+
+	func test_decode_highly_compressible_single_chunk() -> void:
+		# 4 MB of one byte compresses to a few KB, then expands ~1000x past the
+		# decoder's internal buffer. Fed as ONE chunk, this would overflow a naive
+		# put_data() call; _decode_chunk must drain incrementally and recover it.
+		var original := PackedByteArray()
+		original.resize(4 * 1024 * 1024)
+		original.fill(65)  # "A"
+		var compressed := original.compress(FileAccess.COMPRESSION_GZIP)
+		assert_lt(compressed.size(), 65536, "fixture should compress below ring size")
+		var result := _decode_in_pieces(compressed, compressed.size())
+		assert_true(result["ok"])
+		assert_eq((result["data"] as PackedByteArray).size(), original.size())
+		assert_eq(result["data"], original)
+
+	func test_decode_budget_stops_a_bomb_early() -> void:
+		# 4 MB collapsing to a few KB is a decompression bomb. With a small budget,
+		# _decode_chunk must bail out long before materializing all 4 MB, so the
+		# size-limit guard can reject it without an unbounded allocation.
+		var original := PackedByteArray()
+		original.resize(4 * 1024 * 1024)
+		original.fill(65)
+		var compressed := original.compress(FileAccess.COMPRESSION_GZIP)
+		var decoder := StreamPeerGZIP.new()
+		decoder.start_decompression(false)
+		var result := impl._decode_chunk(decoder, compressed, 65536, 1024)
+		assert_true(result["ok"])
+		var produced: int = (result["data"] as PackedByteArray).size()
+		assert_gt(produced, 1024, "should overshoot the budget by at most a buffer")
+		assert_lt(produced, original.size(), "must not decode the whole bomb")
+
+
+## Tests for request header assembly ([method _Impl._build_request_headers]).
+class TestBuildRequestHeaders extends GutTest:
+	var impl: C3HTTPRequest._Impl
+
+	func before_each() -> void:
+		impl = C3HTTPRequest._Impl.new()
+
+	func test_adds_accept_encoding_when_enabled() -> void:
+		var headers := impl._build_request_headers(
+			PackedStringArray(), true, false
+		)
+		assert_true("Accept-Encoding: gzip" in headers)
+
+	func test_does_not_advertise_deflate() -> void:
+		# We advertise gzip only; deflate is intentionally unsupported because raw vs
+		# zlib-wrapped deflate cannot be disambiguated reliably.
+		var headers := impl._build_request_headers(
+			PackedStringArray(), true, false
+		)
+		for header: String in headers:
+			assert_false("deflate" in header.to_lower())
+
+	func test_omits_accept_encoding_when_disabled() -> void:
+		var headers := impl._build_request_headers(
+			PackedStringArray(), false, false
+		)
+		assert_false("Accept-Encoding: gzip" in headers)
+
+	func test_omits_accept_encoding_when_streaming() -> void:
+		var headers := impl._build_request_headers(
+			PackedStringArray(), true, true
+		)
+		assert_false("Accept-Encoding: gzip" in headers)
+
+	func test_caller_accept_encoding_suppresses_ours() -> void:
+		var custom := PackedStringArray(["Accept-Encoding: br"])
+		var headers := impl._build_request_headers(custom, true, false)
+		assert_false("Accept-Encoding: gzip" in headers)
+		assert_true("Accept-Encoding: br" in headers)
+
+	func test_caller_accept_encoding_match_is_case_insensitive() -> void:
+		var custom := PackedStringArray(["accept-encoding: identity"])
+		var headers := impl._build_request_headers(custom, true, false)
+		assert_false("Accept-Encoding: gzip" in headers)
+
+	func test_custom_headers_are_always_appended() -> void:
+		var custom := PackedStringArray(["X-Test: 1", "Authorization: Bearer x"])
+		var headers := impl._build_request_headers(custom, true, false)
+		assert_true("X-Test: 1" in headers)
+		assert_true("Authorization: Bearer x" in headers)
+
+
+## Unit tests for the internal header-value lookup ([method _Impl._header_value]).
+class TestHeaderValue extends GutTest:
+	var impl: C3HTTPRequest._Impl
+
+	func before_each() -> void:
+		impl = C3HTTPRequest._Impl.new()
+
+	func test_finds_value_with_space() -> void:
+		var headers := PackedStringArray(["Accept-Encoding: gzip"])
+		assert_eq(impl._header_value(headers, "Accept-Encoding"), "gzip")
+
+	func test_finds_value_without_space() -> void:
+		var headers := PackedStringArray(["Accept-Encoding:br"])
+		assert_eq(impl._header_value(headers, "Accept-Encoding"), "br")
+
+	func test_lookup_is_case_insensitive() -> void:
+		var headers := PackedStringArray(["content-type: text/plain"])
+		assert_eq(impl._header_value(headers, "Content-Type"), "text/plain")
+
+	func test_returns_empty_when_not_found() -> void:
+		assert_eq(impl._header_value(PackedStringArray(), "Accept-Encoding"), "")
+
+	func test_does_not_match_prefix_of_another_header() -> void:
+		var headers := PackedStringArray(["Accept-Encoding-Extra: gzip"])
+		assert_eq(impl._header_value(headers, "Accept-Encoding"), "")
+
+
+## Tests for the download decompressor factory
+## ([method _Impl._make_download_decoder]).
+class TestMakeDownloadDecoder extends GutTest:
+	var impl: C3HTTPRequest._Impl
+
+	func before_each() -> void:
+		impl = C3HTTPRequest._Impl.new()
+
+	func test_null_when_accept_gzip_false() -> void:
+		# Regression guard: an opted-out caller must never get a decoder, even for a
+		# compressed response.
+		var headers := PackedStringArray(["Content-Encoding: gzip"])
+		assert_null(impl._make_download_decoder(headers, false))
+
+	func test_null_when_no_compression() -> void:
+		assert_null(impl._make_download_decoder(PackedStringArray(), true))
+
+	func test_null_for_identity_encoding() -> void:
+		var headers := PackedStringArray(["Content-Encoding: identity"])
+		assert_null(impl._make_download_decoder(headers, true))
+
+	func test_decoder_for_gzip() -> void:
+		var headers := PackedStringArray(["Content-Encoding: gzip"])
+		assert_not_null(impl._make_download_decoder(headers, true))
+
+	func test_null_for_deflate() -> void:
+		# Deflate is intentionally unsupported, so it never gets a decoder — the raw
+		# bytes stream to disk unchanged.
+		var headers := PackedStringArray(["Content-Encoding: deflate"])
+		assert_null(impl._make_download_decoder(headers, true))
+
+
+## Tests for in-memory body decompression ([method _Impl._maybe_decompress_body]).
+class TestMaybeDecompressBody extends GutTest:
+	var impl: C3HTTPRequest._Impl
+
+	func before_each() -> void:
+		impl = C3HTTPRequest._Impl.new()
+
+	func test_decompresses_gzip_when_enabled() -> void:
+		var original := "Decoded in-memory body.".to_utf8_buffer()
+		var compressed := original.compress(FileAccess.COMPRESSION_GZIP)
+		var headers := PackedStringArray(["Content-Encoding: gzip"])
+		var result: Variant = impl._maybe_decompress_body(
+			compressed, headers, true, -1
+		)
+		assert_eq(result, original)
+
+	func test_deflate_response_is_not_decoded() -> void:
+		# Deflate is intentionally unsupported: a deflate-encoded body is returned
+		# raw rather than decoded, since we never request deflate in the first place.
+		var compressed := "In-memory deflate body.".to_utf8_buffer().compress(
+			FileAccess.COMPRESSION_DEFLATE
+		)
+		var headers := PackedStringArray(["Content-Encoding: deflate"])
+		var result: Variant = impl._maybe_decompress_body(
+			compressed, headers, true, -1
+		)
+		assert_eq(result, compressed)
+
+	func test_leaves_compressed_body_raw_when_disabled() -> void:
+		# Regression guard: with accept_gzip off, a compressed body is returned
+		# untouched — never silently decoded.
+		var original := "Decoded in-memory body.".to_utf8_buffer()
+		var compressed := original.compress(FileAccess.COMPRESSION_GZIP)
+		var headers := PackedStringArray(["Content-Encoding: gzip"])
+		var result: Variant = impl._maybe_decompress_body(
+			compressed, headers, false, -1
+		)
+		assert_eq(result, compressed)
+
+	func test_unchanged_when_no_encoding_header() -> void:
+		var body := "plain body".to_utf8_buffer()
+		var result: Variant = impl._maybe_decompress_body(
+			body, PackedStringArray(), true, -1
+		)
+		assert_eq(result, body)
+
+	func test_unchanged_when_empty() -> void:
+		var headers := PackedStringArray(["Content-Encoding: gzip"])
+		var result: Variant = impl._maybe_decompress_body(
+			PackedByteArray(), headers, true, -1
+		)
+		assert_eq(result, PackedByteArray())
+
+	# A real, valid gzip member whose decompressed content is empty — what a server
+	# emits for an empty gzipped body. (PackedByteArray().compress() shortcuts empty
+	# input to zero bytes, so it can't stand in for this; we need a genuine member.)
+	func _empty_content_gzip() -> PackedByteArray:
+		return PackedByteArray([
+			0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x03, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00,
+		])
+
+	func test_empty_gzipped_body_with_limit_is_ok() -> void:
+		# Regression guard: a gzipped body that decodes to empty must not be mistaken
+		# for an over-limit body. An empty result can never exceed a non-negative cap.
+		var headers := PackedStringArray(["Content-Encoding: gzip"])
+		var result: Variant = impl._maybe_decompress_body(
+			_empty_content_gzip(), headers, true, 1024
+		)
+		assert_false(
+			result is C3HTTPRequest.RequestError, "empty body must not error"
+		)
+		assert_eq(result, PackedByteArray())
+
+	func test_empty_gzipped_body_no_limit_is_ok() -> void:
+		# Without a limit, an empty gzipped body decodes to empty — not the raw
+		# compressed bytes handed back undecoded.
+		var headers := PackedStringArray(["Content-Encoding: gzip"])
+		var result: Variant = impl._maybe_decompress_body(
+			_empty_content_gzip(), headers, true, -1
+		)
+		assert_eq(result, PackedByteArray())
+
+	func test_decompresses_within_limit() -> void:
+		# A body that fits under the cap decodes normally — the limit only rejects
+		# output that exceeds it.
+		var original := "Decoded in-memory body.".to_utf8_buffer()
+		var compressed := original.compress(FileAccess.COMPRESSION_GZIP)
+		var headers := PackedStringArray(["Content-Encoding: gzip"])
+		var result: Variant = impl._maybe_decompress_body(
+			compressed, headers, true, 1024
+		)
+		assert_eq(result, original)
+
+	func test_fails_when_decompressed_output_exceeds_limit() -> void:
+		# Zip-bomb guard: 100 KB of zeros collapses to a ~130-byte gzip body that
+		# passes any reasonable compressed-bytes check, then expands ~750x on decode.
+		# With body_size_limit set, the streaming decoder's budget stops well short of
+		# the full output and the post-decode check returns BODY_SIZE_LIMIT_EXCEEDED,
+		# so the caller surfaces ok == false rather than an unbounded body.
+		var original := PackedByteArray()
+		original.resize(100000)
+		var compressed := original.compress(FileAccess.COMPRESSION_GZIP)
+		var headers := PackedStringArray(["Content-Encoding: gzip"])
+		var result: Variant = impl._maybe_decompress_body(
+			compressed, headers, true, 1024
+		)
+		assert_is(result, C3HTTPRequest.RequestError)
+		assert_eq(
+			(result as C3HTTPRequest.RequestError).kind,
+			C3HTTPRequest.RequestError.Kind.BODY_SIZE_LIMIT_EXCEEDED
+		)
+
+	func test_corrupt_gzip_body_fails() -> void:
+		# A garbage body labelled gzip can't be decoded; the streaming decoder reports
+		# a decode error, which surfaces as a TRANSPORT failure (matching the download
+		# branch) rather than being passed through as raw bytes.
+		var garbage := PackedByteArray(
+			[0x1f, 0x8b, 0x08, 0xff, 0xde, 0xad, 0xbe, 0xef]
+		)
+		var headers := PackedStringArray(["Content-Encoding: gzip"])
+		var result: Variant = impl._maybe_decompress_body(
+			garbage, headers, true, -1
+		)
+		assert_is(result, C3HTTPRequest.RequestError)
+		assert_eq(
+			(result as C3HTTPRequest.RequestError).kind,
+			C3HTTPRequest.RequestError.Kind.TRANSPORT
+		)
+		# StreamPeerGZIP logs an engine error on malformed input; assert it so GUT
+		# treats the expected log as handled rather than an unexpected failure.
+		assert_engine_error("Returning: FAILED")
+
+
+# A minimal loopback HTTP/1.1 server that announces a large Content-Length but
+# only sends a short body prefix, then holds the connection open. This drives a
+# real HTTPClient into STATUS_BODY (so the body-reading loop runs) without ever
+# completing the response, letting a test abort the transfer mid-stream. Runs on
+# its own thread so it can feed the socket while the client polls on the main
+# thread.
+class _PartialBodyServer:
+	var port := 0
+	var _server := TCPServer.new()
+	var _thread := Thread.new()
+	var _stop := false
+
+	# Starts listening on a free loopback port and returns it, or 0 on failure.
+	func start() -> int:
+		for candidate in range(49500, 49600):
+			if _server.listen(candidate, "127.0.0.1") == OK:
+				port = candidate
+				break
+		if port == 0:
+			return 0
+		_thread.start(_serve)
+		return port
+
+	func stop() -> void:
+		_stop = true
+		if _thread.is_started():
+			_thread.wait_to_finish()
+		_server.stop()
+
+	func _serve() -> void:
+		var peer: StreamPeerTCP = null
+		while not _stop:
+			if _server.is_connection_available():
+				peer = _server.take_connection()
+				break
+			OS.delay_msec(5)
+		if peer == null:
+			return
+		# Read (and discard) the request bytes so the client's send completes.
+		var deadline := Time.get_ticks_msec() + 2000
+		while Time.get_ticks_msec() < deadline:
+			peer.poll()
+			var available := peer.get_available_bytes()
+			if available > 0:
+				peer.get_data(available)
+				break
+			OS.delay_msec(5)
+		# Promise 1000 bytes but send only a short prefix, then stall with the
+		# connection open so the client sits in STATUS_BODY.
+		var header := (
+			"HTTP/1.1 200 OK\r\n"
+			+ "Content-Length: 1000\r\n"
+			+ "Content-Type: application/octet-stream\r\n\r\n"
+		)
+		peer.put_data(header.to_utf8_buffer())
+		peer.put_data("PARTIAL\n".to_utf8_buffer())
+		while not _stop:
+			peer.poll()
+			OS.delay_msec(10)
+		peer.disconnect_from_host()
+
+
+## Integration tests asserting that aborting a download mid-stream deletes the
+## partial file. These run a real HTTPClient against [_PartialBodyServer].
+class TestDownloadFileCleanup extends GutTest:
+	const _DOWNLOAD_PATH := "user://test_partial_download.bin"
+
+	var _server: _PartialBodyServer
+
+	func before_each() -> void:
+		_server = _PartialBodyServer.new()
+		if FileAccess.file_exists(_DOWNLOAD_PATH):
+			DirAccess.remove_absolute(_DOWNLOAD_PATH)
+
+	func after_each() -> void:
+		_server.stop()
+		if FileAccess.file_exists(_DOWNLOAD_PATH):
+			DirAccess.remove_absolute(_DOWNLOAD_PATH)
+
+	func _url() -> String:
+		var port := _server.start()
+		assert_ne(port, 0, "server failed to bind a port")
+		return "http://127.0.0.1:%d/" % port
+
+	func test_timeout_removes_partial_download_file() -> void:
+		var url := _url()
+		var opts := C3HTTPRequest.Options.new()
+		opts.download_file = _DOWNLOAD_PATH
+		opts.timeout = 0.2
+		var res: C3HTTPRequest.Response = await (
+			C3HTTPRequest
+			. _Impl
+			. new()
+			. execute(url, PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
+		)
+		assert_false(res.ok)
+		assert_eq(res.error.kind, C3HTTPRequest.RequestError.Kind.TIMEOUT)
+		assert_false(
+			FileAccess.file_exists(_DOWNLOAD_PATH),
+			"partial download file should be deleted on timeout"
+		)
+
+	func test_cancellation_removes_partial_download_file() -> void:
+		var url := _url()
+		var token := C3HTTPRequest.CancellationToken.new()
+		var opts := C3HTTPRequest.Options.new()
+		opts.download_file = _DOWNLOAD_PATH
+		opts.timeout = 5.0
+		opts.cancellation_token = token
+		# Cancel as soon as the first body bytes land — by then the partial file
+		# exists, so the cancel path must clean it up.
+		opts.on_progress = func(_received: int, _total: int) -> void:
+			token.cancel()
+		var res: C3HTTPRequest.Response = await (
+			C3HTTPRequest
+			. _Impl
+			. new()
+			. execute(url, PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
+		)
+		assert_false(res.ok)
+		assert_eq(res.error.kind, C3HTTPRequest.RequestError.Kind.CANCELLED)
+		assert_false(
+			FileAccess.file_exists(_DOWNLOAD_PATH),
+			"partial download file should be deleted on cancellation"
+		)
+
+	func test_no_file_created_when_aborted_before_body() -> void:
+		# A request that fails before any body arrives must never create (and so never
+		# truncate) the download file. We cancel while still connecting — past the point
+		# the file was historically opened, but before the body phase. 192.0.2.1 is
+		# TEST-NET-1 (RFC 5737): guaranteed unroutable, so the connection stays pending
+		# (no DNS, no server, no completion), giving the poll loop a chance to yield once
+		# — where _CancelWhileConnectingImpl cancels.
+		var token := C3HTTPRequest.CancellationToken.new()
+		var impl := _CancelWhileConnectingImpl.new()
+		impl.token = token
+		var opts := C3HTTPRequest.Options.new()
+		opts.download_file = _DOWNLOAD_PATH
+		opts.cancellation_token = token
+		opts.timeout = 5.0  # safety net; the cancel fires on the first poll yield
+		var res: C3HTTPRequest.Response = await impl.execute(
+			"http://192.0.2.1/",
+			PackedStringArray(),
+			HTTPClient.METHOD_GET,
+			"",
+			opts
+		)
+		assert_false(res.ok)
+		assert_eq(res.error.kind, C3HTTPRequest.RequestError.Kind.CANCELLED)
+		assert_false(
+			FileAccess.file_exists(_DOWNLOAD_PATH),
+			"no download file should be created when the request aborts before the body phase"
+		)
+
+	# Cancels its own request the first time the poll loop yields — i.e. while still
+	# connecting, before any response or body. Lets a test reach a pre-body early
+	# return deterministically, without depending on connection timing.
+	class _CancelWhileConnectingImpl extends C3HTTPRequest._Impl:
+		var token: C3HTTPRequest.CancellationToken
+
+		func _pump(tree: SceneTree, on_worker: bool) -> void:
+			token.cancel()
+			await super._pump(tree, on_worker)

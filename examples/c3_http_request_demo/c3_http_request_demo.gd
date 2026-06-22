@@ -23,8 +23,8 @@ func _ready() -> void:
 
 func demo_get() -> void:
 	output_overlay.print_with_overlay("\n--- GET ---")
-	# accept_gzip is true by default: Accept-Encoding: gzip, deflate is
-	# injected and the response body is transparently decompressed.
+	# accept_gzip is true by default: Accept-Encoding: gzip is injected and
+	# the response body is transparently decompressed.
 	var res := await C3HTTPRequest.request(
 		"https://jsonplaceholder.typicode.com/todos/1"
 	)
