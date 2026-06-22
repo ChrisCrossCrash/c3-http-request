@@ -10,9 +10,9 @@ Tests use the [GUT](https://github.com/bitwes/Gut) framework. Run the full suite
 godot --headless --path . -s addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit
 ```
 
-To run a single test file, add `-gtest=res://tests/test_c3_http_request.gd` (swap in the desired file).
+To run a single test file, add `-gtest=res://tests/test_public_api.gd` (swap in the desired file).
 
-All tests must pass before a pull request is approved. No real HTTP calls are made — `TestableImpl` inside `tests/test_c3_http_request.gd` intercepts all network behavior in-process.
+All tests must pass before a pull request is approved. No real HTTP calls are made — `TestableImpl` inside `tests/test_public_api.gd` intercepts all network behavior in-process.
 
 ## Code Style
 

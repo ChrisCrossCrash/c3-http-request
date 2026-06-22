@@ -17,7 +17,7 @@ godot --headless --path . -s addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude
 **Run a single test file:**
 
 ```
-godot --headless --path . -s addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit -gtest=res://tests/test_c3_http_request.gd
+godot --headless --path . -s addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit -gtest=res://tests/test_public_api.gd
 ```
 
 If GUT reports "does not extend GutTest" or "Nothing was run" after files or classes have been renamed, the global script class cache is stale — rebuild it first with `godot --headless --path . --import`.
@@ -50,7 +50,7 @@ The addon is a single script: [c3_http_request/c3_http_request.gd](c3_http_reque
 
 **Transport** is Godot's `HTTPClient` (a `RefCounted`), created per call inside `_Impl.execute()`. The polling loop's single yield point is `_pump()`: in the default cooperative mode it yields to `SceneTree.process_frame` via `Engine.get_main_loop()` (no scene tree membership required from the caller); when `Options.use_threads` is set, `execute()` runs on a worker `Thread` and `_pump()` becomes a synchronous `OS.delay_usec()` so the coroutine runs straight through off the main thread.
 
-**Tests** are in [tests/](tests/) using the GUT framework (in [addons/gut/](addons/gut/)). `TestableImpl` inside `tests/test_c3_http_request.gd` overrides `execute()` so no real HTTP calls are made.
+**Tests** are in [tests/](tests/) using the GUT framework (in [addons/gut/](addons/gut/)). Each file covers a focused area: `test_public_api.gd` (public API and types), `test_sse_parsing.gd`, `test_url_and_routing.gd`, `test_compression.gd`, `test_headers.gd`, `test_download_file_cleanup.gd`. `TestableImpl` inside `tests/test_public_api.gd` overrides `execute()` so no real HTTP calls are made.
 
 ## GDScript Style Guide
 
