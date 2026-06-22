@@ -25,6 +25,13 @@ const _METHOD_MAP: Dictionary = {
 static var _impl: _Impl = _Impl.new()
 
 
+func _init() -> void:
+	push_warning(
+		"C3HTTPRequest is not meant to be instantiated like Godot's native "
+		+ "HTTPRequest. Call C3HTTPRequest.request() directly."
+	)
+
+
 ## Sends an HTTP request to [param url] and returns the response. [br]
 ## [param custom_headers] are sent alongside any headers injected by
 ## [member Options.accept_gzip]. [br]

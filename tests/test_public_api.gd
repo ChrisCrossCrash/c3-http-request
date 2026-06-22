@@ -477,3 +477,9 @@ class TestCancellationToken extends GutTest:
 			opts
 		)
 		assert_string_contains(str(res.error), "[cancelled]")
+
+
+class TestInstantiation extends GutTest:
+	func test_instantiation_pushes_warning() -> void:
+		C3HTTPRequest.new()
+		assert_push_warning("not meant to be instantiated")
