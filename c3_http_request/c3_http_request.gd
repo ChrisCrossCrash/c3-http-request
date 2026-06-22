@@ -10,7 +10,7 @@ class_name C3HTTPRequest
 enum Method { GET = 0, HEAD, POST, PUT, DELETE, OPTIONS, PATCH }
 
 ## The installed version of this addon, e.g. for logging or feature gating.
-const VERSION := "v0.2.0"
+const VERSION := "v0.3.0"
 
 const _METHOD_MAP: Dictionary = {
 	Method.GET: HTTPClient.METHOD_GET,
