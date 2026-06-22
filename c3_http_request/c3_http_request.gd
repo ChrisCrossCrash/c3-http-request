@@ -209,6 +209,13 @@ class Options:
 	## followed. Purely observational: the request's outcome is still reported via
 	## the returned [code]Response[/code]. Very brief intermediate states may be coalesced.
 	var on_status_changed: Callable = Callable()
+	## Optional [Session] for HTTP keep-alive connection reuse. When set, idle
+	## connections to the same host are pooled and reused across calls, reducing
+	## latency for repeated requests to the same endpoint. [br][br]
+	## [code]null[/code] (the default) disables pooling: each call opens a fresh
+	## connection. Create a [Session] once and share it across calls that target
+	## the same set of hosts.
+	var session: Session = null
 
 
 ## The response returned by [method C3HTTPRequest.request].
@@ -354,41 +361,112 @@ class CancellationToken:
 		return _cancelled
 
 
-## Canned-response builder returned by [method Mock.stub]. Configure with
-## [method ok], [method fail], or [method returns], then discard — the [code]Mock[/code]
-## retains the stub internally.
-class _Stub:
-	var _url: String
-	var _preset: Response = null
+## Holds a pool of idle HTTP connections for reuse across calls, reducing the
+## TCP and TLS handshake cost for repeated requests to the same host.
+##
+## Create one [Session] per logical group of requests and set it on
+## [member Options.session]. A [Session] is a [RefCounted] and is freed
+## automatically when no [Options] objects reference it. [br][br]
+## One-off callers that leave [member Options.session] as [code]null[/code]
+## pay zero cost — a fresh connection is opened each time, as in previous versions.
+class Session:
+	## Maximum number of idle connections kept per unique
+	## [code](host, port, scheme, TLS, proxy)[/code] key. Extra connections
+	## beyond this limit are closed immediately on checkin.
+	var max_connections_per_host: int = 4
+	## Seconds an idle connection may sit in the pool before being discarded on
+	## the next checkout attempt. Keep this shorter than the server's keep-alive
+	## timeout (nginx defaults to 75 s, so 60 s is a safe choice). Set to
+	## [code]0.0[/code] to disable time-based eviction.
+	var idle_timeout: float = 60.0
 
-	func _init(url: String) -> void:
-		_url = url
+	var _pool: Dictionary = {}
+	var _mutex: Mutex = Mutex.new()
 
-	## Configures a successful response. [param json] is JSON-encoded into
-	## [member Response.body].
-	func ok(json: Dictionary = {}, status: int = 200) -> void:
-		var res := Response.new()
-		res.ok = true
-		res.status = status
-		res.body = JSON.stringify(json).to_utf8_buffer()
-		_preset = res
+	class _PoolEntry:
+		var client: HTTPClient
+		var checked_in_at_msec: int
 
-	## Configures a failure response. Build [param error] with the
-	## [code]RequestError[/code] factory methods ([method RequestError.transport],
-	## [method RequestError.timed_out], etc.) or construct one manually.
-	func fail(error: RequestError) -> void:
-		var res := Response.new()
-		res.ok = false
-		res.error = error
-		res.status = error.status
-		_preset = res
+	## Closes all pooled connections and empties the pool. Optional — connections
+	## are also freed when the [Session] goes out of scope.
+	func close() -> void:
+		_mutex.lock()
+		for key: String in _pool:
+			for entry: _PoolEntry in _pool[key]:
+				entry.client.close()
+		_pool.clear()
+		_mutex.unlock()
 
-	## Sets a [code]Response[/code] directly, bypassing [method ok] and [method fail].
-	func returns(response: Response) -> void:
-		_preset = response
+	## Evicts all idle connections whose age exceeds [member idle_timeout].
+	## Useful after a network change to force fresh connections on the next call.
+	func prune() -> void:
+		if idle_timeout <= 0.0:
+			return
+		var now := Time.get_ticks_msec()
+		_mutex.lock()
+		for key: String in _pool.keys():
+			var entries: Array = _pool[key]
+			var i := entries.size() - 1
+			while i >= 0:
+				var entry: _PoolEntry = entries[i]
+				if (now - entry.checked_in_at_msec) / 1000.0 >= idle_timeout:
+					entry.client.close()
+					entries.remove_at(i)
+				i -= 1
+			if entries.is_empty():
+				_pool.erase(key)
+		_mutex.unlock()
 
-	func _response() -> Response:
-		return _preset if _preset != null else Response.new()
+	func _make_key(
+		host: String,
+		port: int,
+		tls: bool,
+		tls_options: TLSOptions,
+		options: Options
+	) -> String:
+		var tls_id := 0 if tls_options == null else tls_options.get_instance_id()
+		var proxy := "%s:%d|%s:%d" % [
+			options.http_proxy_host,
+			options.http_proxy_port,
+			options.https_proxy_host,
+			options.https_proxy_port,
+		]
+		return "%s:%d:%s:%d:%s" % [host, port, str(tls), tls_id, proxy]
+
+	func checkout(key: String) -> HTTPClient:
+		_mutex.lock()
+		if not _pool.has(key):
+			_mutex.unlock()
+			return null
+		var entries: Array = _pool[key]
+		var now := Time.get_ticks_msec()
+		var result: HTTPClient = null
+		while not entries.is_empty() and result == null:
+			var entry: _PoolEntry = entries.pop_back()
+			if entry.client.get_status() != HTTPClient.STATUS_CONNECTED:
+				continue
+			if idle_timeout > 0.0 and (now - entry.checked_in_at_msec) / 1000.0 >= idle_timeout:
+				entry.client.close()
+				continue
+			result = entry.client
+		if entries.is_empty():
+			_pool.erase(key)
+		_mutex.unlock()
+		return result
+
+	func checkin(key: String, client: HTTPClient) -> void:
+		_mutex.lock()
+		if not _pool.has(key):
+			_pool[key] = []
+		var entries: Array = _pool[key]
+		if entries.size() >= max_connections_per_host:
+			var oldest: _PoolEntry = entries.pop_front()
+			oldest.client.close()
+		var entry := _PoolEntry.new()
+		entry.client = client
+		entry.checked_in_at_msec = Time.get_ticks_msec()
+		entries.push_back(entry)
+		_mutex.unlock()
 
 
 ## Test helper that intercepts [method C3HTTPRequest.request] calls.
@@ -483,6 +561,43 @@ class Mock extends _Impl:
 		return fallback if fallback != null else _Stub.new("")
 
 
+## Canned-response builder returned by [method Mock.stub]. Configure with
+## [method ok], [method fail], or [method returns], then discard — the [code]Mock[/code]
+## retains the stub internally.
+class _Stub:
+	var _url: String
+	var _preset: Response = null
+
+	func _init(url: String) -> void:
+		_url = url
+
+	## Configures a successful response. [param json] is JSON-encoded into
+	## [member Response.body].
+	func ok(json: Dictionary = {}, status: int = 200) -> void:
+		var res := Response.new()
+		res.ok = true
+		res.status = status
+		res.body = JSON.stringify(json).to_utf8_buffer()
+		_preset = res
+
+	## Configures a failure response. Build [param error] with the
+	## [code]RequestError[/code] factory methods ([method RequestError.transport],
+	## [method RequestError.timed_out], etc.) or construct one manually.
+	func fail(error: RequestError) -> void:
+		var res := Response.new()
+		res.ok = false
+		res.error = error
+		res.status = error.status
+		_preset = res
+
+	## Sets a [code]Response[/code] directly, bypassing [method ok] and [method fail].
+	func returns(response: Response) -> void:
+		_preset = response
+
+	func _response() -> Response:
+		return _preset if _preset != null else Response.new()
+
+
 class _Impl:
 	class _ParsedURL:
 		var host: String
@@ -542,51 +657,36 @@ class _Impl:
 			custom_headers, options.accept_gzip, streaming
 		)
 
-		var client := HTTPClient.new()
-		client.set_read_chunk_size(options.download_chunk_size)
-		var proxies := _resolve_proxies(options)
-		if proxies.has("http"):
-			client.set_http_proxy(proxies["http"][0], proxies["http"][1])
-		if proxies.has("https"):
-			client.set_https_proxy(proxies["https"][0], proxies["https"][1])
-
-		var err: int
-		if parsed.tls:
-			var tls: TLSOptions = (
-				options.tls_options
-				if options.tls_options != null
-				else TLSOptions.client()
-			)
-			err = client.connect_to_host(parsed.host, parsed.port, tls)
-		else:
-			err = client.connect_to_host(parsed.host, parsed.port)
-		if err != OK:
-			return _fail(RequestError.transport(
-				"Failed to start connection (error %d)." % err
-			))
-
 		var tree := Engine.get_main_loop() as SceneTree
 		var start_ms := Time.get_ticks_msec() if _start_ms < 0 else _start_ms
 		var last_status := HTTPClient.STATUS_DISCONNECTED
 
-		while true:
-			client.poll()
-			last_status = _emit_status_change(client, last_status, options, _on_worker)
-			if client.get_status() not in [
-				HTTPClient.STATUS_CONNECTING, HTTPClient.STATUS_RESOLVING
-			]:
-				break
-			if _timed_out(start_ms, options.timeout):
-				return _fail(RequestError.timed_out("Timed out while connecting."))
-			if _cancelled(options):
-				return _fail(RequestError.cancelled("Request was cancelled."))
-			await _pump(tree, _on_worker)
+		var pool_key := ""
+		var reusing := false
+		var client: HTTPClient
+		if options.session != null:
+			pool_key = options.session._make_key(
+				parsed["host"], parsed["port"], parsed["tls"], options.tls_options, options
+			)
+			var pooled: HTTPClient = options.session.checkout(pool_key)
+			if pooled != null:
+				client = pooled
+				reusing = true
+			else:
+				client = HTTPClient.new()
+		else:
+			client = HTTPClient.new()
+		client.set_read_chunk_size(options.download_chunk_size)
 
-		if client.get_status() != HTTPClient.STATUS_CONNECTED:
-			return _fail(RequestError.transport(
-				"Could not connect (status %d)." % client.get_status()
-			))
+		if not reusing:
+			var conn_err: Variant = await _connect_client(
+				client, parsed, options, start_ms, tree, _on_worker
+			)
+			if conn_err != null:
+				return conn_err
+		last_status = HTTPClient.STATUS_CONNECTED
 
+		var err: int
 		if request_data is PackedByteArray:
 			err = client.request_raw(
 				method, parsed.path, all_headers, request_data
@@ -596,9 +696,30 @@ class _Impl:
 				method, parsed.path, all_headers, request_data
 			)
 		if err != OK:
-			return _fail(RequestError.transport(
-				"Failed to send request (error %d)." % err
-			))
+			if reusing:
+				# The pooled connection went stale between checkout and use.
+				# Discard it and retry with a fresh connection transparently.
+				client = HTTPClient.new()
+				client.set_read_chunk_size(options.download_chunk_size)
+				reusing = false
+				var retry_err: Variant = await _connect_client(
+					client, parsed, options, start_ms, tree, _on_worker
+				)
+				if retry_err != null:
+					return retry_err
+				last_status = HTTPClient.STATUS_CONNECTED
+				if request_data is PackedByteArray:
+					err = client.request_raw(
+						method, parsed["path"], all_headers, request_data
+					)
+				else:
+					err = client.request(
+						method, parsed["path"], all_headers, request_data
+					)
+			if err != OK:
+				return _fail(RequestError.transport(
+					"Failed to send request (error %d)." % err
+				))
 
 		while true:
 			client.poll()
@@ -810,6 +931,10 @@ class _Impl:
 						DirAccess.remove_absolute(options.download_file)
 				return redirect_res
 
+		if options.session != null and not pool_key.is_empty():
+			if client.get_status() == HTTPClient.STATUS_CONNECTED:
+				options.session.checkin(pool_key, client)
+
 		var res := Response.new()
 		res.status = status
 		res.headers = resp_headers
@@ -835,6 +960,56 @@ class _Impl:
 				e.message = "Request failed with status %d." % status
 			res.error = e
 		return res
+
+	# Connects [param client] to the host described by [param parsed], applying
+	# proxies and TLS from [param options], then polls until STATUS_CONNECTED or
+	# a timeout or cancellation occurs. Returns null on success; returns an error
+	# Response on failure.
+	func _connect_client(
+		client: HTTPClient,
+		parsed: Dictionary,
+		options: Options,
+		start_ms: int,
+		tree: SceneTree,
+		on_worker: bool
+	) -> Variant:
+		var proxies := _resolve_proxies(options)
+		if proxies.has("http"):
+			client.set_http_proxy(proxies["http"][0], proxies["http"][1])
+		if proxies.has("https"):
+			client.set_https_proxy(proxies["https"][0], proxies["https"][1])
+		var err: int
+		if parsed["tls"]:
+			var tls: TLSOptions = (
+				options.tls_options
+				if options.tls_options != null
+				else TLSOptions.client()
+			)
+			err = client.connect_to_host(parsed["host"], parsed["port"], tls)
+		else:
+			err = client.connect_to_host(parsed["host"], parsed["port"])
+		if err != OK:
+			return _fail(RequestError.transport(
+				"Failed to start connection (error %d)." % err
+			))
+		var last_status := HTTPClient.STATUS_DISCONNECTED
+		while true:
+			client.poll()
+			last_status = _emit_status_change(client, last_status, options, on_worker)
+			if client.get_status() not in [
+				HTTPClient.STATUS_CONNECTING, HTTPClient.STATUS_RESOLVING
+			]:
+				break
+			if _timed_out(start_ms, options.timeout):
+				return _fail(RequestError.timed_out("Timed out while connecting."))
+			if _cancelled(options):
+				return _fail(RequestError.cancelled("Request was cancelled."))
+			await _pump(tree, on_worker)
+		if client.get_status() != HTTPClient.STATUS_CONNECTED:
+			return _fail(RequestError.transport(
+				"Could not connect (status %d)." % client.get_status()
+			))
+		return null
 
 	# Yields between polls. On a worker thread it sleeps briefly and returns
 	# synchronously — the await never suspends, so request() runs straight through
