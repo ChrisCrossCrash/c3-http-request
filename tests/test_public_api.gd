@@ -14,7 +14,8 @@ class TestableImpl extends C3HTTPRequest._Impl:
 		request_data: Variant,
 		options: C3HTTPRequest.Options,
 		_redirects_left: int = -1,
-		_on_worker: bool = false
+		_on_worker: bool = false,
+		_start_ms: int = -1
 	) -> C3HTTPRequest.Response:
 		call_log.append({
 			"url": url,

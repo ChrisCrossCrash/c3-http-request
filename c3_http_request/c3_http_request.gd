@@ -357,7 +357,8 @@ class _Impl:
 		request_data: Variant,
 		options: Options,
 		_redirects_left: int = -1,
-		_on_worker: bool = false
+		_on_worker: bool = false,
+		_start_ms: int = -1
 	) -> Response:
 		# options.use_threads is read exactly once — here — to decide whether to
 		# spawn a worker. Every downstream poll and dispatch decision uses _on_worker
@@ -413,7 +414,7 @@ class _Impl:
 			))
 
 		var tree := Engine.get_main_loop() as SceneTree
-		var start_ms := Time.get_ticks_msec()
+		var start_ms := Time.get_ticks_msec() if _start_ms < 0 else _start_ms
 		var last_status := HTTPClient.STATUS_DISCONNECTED
 
 		while true:
@@ -524,6 +525,8 @@ class _Impl:
 			last_status = _emit_status_change(
 				client, last_status, options, _on_worker
 			)
+			if client.get_status() != HTTPClient.STATUS_BODY:
+				break
 			var chunk: PackedByteArray = client.read_response_body_chunk()
 			if chunk.is_empty():
 				await _pump(tree, _on_worker)
@@ -623,21 +626,30 @@ class _Impl:
 		if status >= 300 and status < 400 and redirects_left > 0:
 			var location := _header_value(resp_headers, "Location")
 			if not location.is_empty():
-				return await execute(
-					_resolve_redirect_url(
-						location,
-						parsed["host"],
-						parsed["port"],
-						parsed["tls"],
-						parsed["path"]
-					),
-					custom_headers,
+				var redirect_url := _resolve_redirect_url(
+					location,
+					parsed["host"],
+					parsed["port"],
+					parsed["tls"],
+					parsed["path"]
+				)
+				var redirect_headers := _strip_auth_if_cross_origin(
+					custom_headers, parsed, _parse_url(redirect_url)
+				)
+				var redirect_res: Response = await execute(
+					redirect_url,
+					redirect_headers,
 					_redirect_method(method, status),
 					_redirect_body(method, status, request_data),
 					options,
 					redirects_left - 1,
-					_on_worker
+					_on_worker,
+					start_ms
 				)
+				if not redirect_res.ok and not options.download_file.is_empty():
+					if FileAccess.file_exists(options.download_file):
+						DirAccess.remove_absolute(options.download_file)
+				return redirect_res
 
 		var res := Response.new()
 		res.status = status
@@ -1022,6 +1034,30 @@ class _Impl:
 		):
 			return ""
 		return request_data
+
+	# Returns headers with Authorization, Cookie, Cookie2, and Proxy-Authorization
+	# stripped when the redirect crosses origins (different host, port, or scheme).
+	# Same-origin redirects keep all headers intact so authenticated API chains work.
+	func _strip_auth_if_cross_origin(
+		headers: PackedStringArray,
+		origin: Dictionary,
+		redirect: Dictionary
+	) -> PackedStringArray:
+		if redirect.is_empty():
+			return headers
+		if (
+			origin["host"] == redirect["host"]
+			and origin["port"] == redirect["port"]
+			and origin["tls"] == redirect["tls"]
+		):
+			return headers
+		var sensitive := ["authorization", "cookie", "cookie2", "proxy-authorization"]
+		var out := PackedStringArray()
+		for header: String in headers:
+			var colon := header.find(":")
+			if colon == -1 or header.substr(0, colon).strip_edges().to_lower() not in sensitive:
+				out.append(header)
+		return out
 
 	# Carves every complete event out of [param buffer], dispatching each to
 	# [param on_event], and returns the trailing partial bytes (an incomplete
