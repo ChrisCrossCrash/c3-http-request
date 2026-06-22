@@ -158,13 +158,20 @@ func _bench_latency(url: String) -> void:
 		var label := "uncapped" if cap == 0 else "%d fps" % cap
 		_phase = "Latency"
 		_show_status()
+		# A fresh session per cap so each section starts with an empty pool.
+		# Warmup calls pre-fill it before timing begins.
+		var session := C3HTTPRequest.Session.new()
 		for _i in WARMUPS:
 			await _time_c3(url, false)
 			await _time_c3(url, true)
+			await _time_c3_session(url, session, false)
+			await _time_c3_session(url, session, true)
 			await _time_native(url, false)
 			await _time_native(url, true)
 		var c3_coop: Array[int] = []
 		var c3_threaded: Array[int] = []
+		var c3_session_coop: Array[int] = []
+		var c3_session_threaded: Array[int] = []
 		var native_coop: Array[int] = []
 		var native_threaded: Array[int] = []
 		# Interleave the variants within each run so any slow drift in machine
@@ -172,12 +179,17 @@ func _bench_latency(url: String) -> void:
 		for _i in RUNS:
 			c3_coop.append(await _time_c3(url, false))
 			c3_threaded.append(await _time_c3(url, true))
+			c3_session_coop.append(await _time_c3_session(url, session, false))
+			c3_session_threaded.append(await _time_c3_session(url, session, true))
 			native_coop.append(await _time_native(url, false))
 			native_threaded.append(await _time_native(url, true))
 		Engine.max_fps = 0
 		output_overlay.print_with_overlay("\n%-12s         cooperative   threaded" % label)
 		output_overlay.print_with_overlay("C3HTTPRequest:        %7.2f ms   %7.2f ms" % [
 			_median_ms(c3_coop), _median_ms(c3_threaded)
+		])
+		output_overlay.print_with_overlay("C3 (session):         %7.2f ms   %7.2f ms" % [
+			_median_ms(c3_session_coop), _median_ms(c3_session_threaded)
 		])
 		output_overlay.print_with_overlay("native HTTPRequest:   %7.2f ms   %7.2f ms" % [
 			_median_ms(native_coop), _median_ms(native_threaded)
@@ -232,6 +244,21 @@ func _time_c3(url: String, use_threads: bool) -> int:
 	var elapsed := Time.get_ticks_usec() - start
 	if not res.ok:
 		push_error("C3HTTPRequest failed: %s" % str(res.error))
+	return elapsed
+
+
+func _time_c3_session(url: String, session: C3HTTPRequest.Session, use_threads: bool) -> int:
+	_show_status("C3 (session)", use_threads)
+	var opts := C3HTTPRequest.Options.new()
+	opts.use_threads = use_threads
+	opts.session = session
+	var start := Time.get_ticks_usec()
+	var res := await C3HTTPRequest.request(
+		url, _auth_headers, C3HTTPRequest.Method.GET, "", opts
+	)
+	var elapsed := Time.get_ticks_usec() - start
+	if not res.ok:
+		push_error("C3HTTPRequest (session) failed: %s" % str(res.error))
 	return elapsed
 
 
