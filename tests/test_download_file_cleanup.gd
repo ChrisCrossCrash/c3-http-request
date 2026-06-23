@@ -15,7 +15,7 @@ class _PartialBodyServer:
 
 	# Starts listening on a free loopback port and returns it, or 0 on failure.
 	func start() -> int:
-		for candidate in range(49500, 49600):
+		for candidate in range(38500, 38600):
 			if _server.listen(candidate, "127.0.0.1") == OK:
 				port = candidate
 				break

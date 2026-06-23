@@ -9,7 +9,7 @@ class _RedirectServer:
 	var _stop := false
 
 	func start(location: String) -> int:
-		for candidate: int in range(49700, 49750):
+		for candidate: int in range(38700, 38800):
 			if _server.listen(candidate, "127.0.0.1") == OK:
 				port = candidate
 				break
@@ -66,7 +66,7 @@ class _HeaderRecordingServer:
 	var _stop := false
 
 	func start() -> int:
-		for candidate: int in range(49750, 49800):
+		for candidate: int in range(38800, 38900):
 			if _server.listen(candidate, "127.0.0.1") == OK:
 				port = candidate
 				break
@@ -137,7 +137,7 @@ class _SameOriginRedirectServer:
 	var _stop := false
 
 	func start() -> int:
-		for candidate: int in range(49800, 49850):
+		for candidate: int in range(38900, 39000):
 			if _server.listen(candidate, "127.0.0.1") == OK:
 				port = candidate
 				break
