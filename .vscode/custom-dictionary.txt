@@ -12,6 +12,7 @@ CAPSLOCK
 ceili
 centiseconds
 chatcmpl
+checkin
 chriskumm
 clampf
 cmdln
