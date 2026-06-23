@@ -52,6 +52,7 @@ ONNX
 onready
 randf
 randfn
+redir
 respawn
 rfind
 RGBA

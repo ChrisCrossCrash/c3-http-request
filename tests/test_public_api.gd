@@ -1,46 +1,16 @@
 extends GutTest
 
 
-class TestableImpl extends C3HTTPRequest._Impl:
-	## The response returned for every call to execute().
-	var preset: C3HTTPRequest.Response = null
-	## Ordered log of all execute() calls.
-	var call_log: Array[Dictionary] = []
-
-	func execute(
-		url: String,
-		custom_headers: PackedStringArray,
-		method: int,
-		request_data: Variant,
-		options: C3HTTPRequest.Options,
-		_redirects_left: int = -1,
-		_on_worker: bool = false,
-		_start_ms: int = -1
-	) -> C3HTTPRequest.Response:
-		call_log.append({
-			"url": url,
-			"custom_headers": custom_headers,
-			"method": method,
-			"request_data": request_data,
-			"options": options,
-		})
-		if preset != null:
-			return preset
-		var res := C3HTTPRequest.Response.new()
-		return res
-
-
 ## Tests for the static [method C3HTTPRequest.request] method.
 class TestRequest extends GutTest:
-	var impl: TestableImpl
+	var mock: C3HTTPRequest.Mock
 
 	func before_each() -> void:
-		impl = TestableImpl.new()
-		C3HTTPRequest._impl = impl
-		impl.preset = C3HTTPRequest.Response.new()
+		mock = C3HTTPRequest.Mock.new()
+		mock.install()
 
 	func after_each() -> void:
-		C3HTTPRequest._impl = C3HTTPRequest._Impl.new()
+		mock.uninstall()
 
 	func test_returns_response_object() -> void:
 		var res := await C3HTTPRequest.request("https://example.com")
@@ -48,11 +18,11 @@ class TestRequest extends GutTest:
 
 	func test_delegates_url_to_impl() -> void:
 		await C3HTTPRequest.request("https://example.com/path")
-		assert_eq(impl.call_log[0]["url"], "https://example.com/path")
+		assert_eq(mock.calls[0]["url"], "https://example.com/path")
 
 	func test_default_method_is_get() -> void:
 		await C3HTTPRequest.request("https://example.com")
-		assert_eq(impl.call_log[0]["method"], HTTPClient.METHOD_GET)
+		assert_eq(mock.calls[0]["method"], HTTPClient.METHOD_GET)
 
 	func test_method_is_forwarded() -> void:
 		await C3HTTPRequest.request(
@@ -60,14 +30,14 @@ class TestRequest extends GutTest:
 			PackedStringArray(),
 			C3HTTPRequest.Method.POST
 		)
-		assert_eq(impl.call_log[0]["method"], HTTPClient.METHOD_POST)
+		assert_eq(mock.calls[0]["method"], HTTPClient.METHOD_POST)
 
 	func test_custom_headers_forwarded() -> void:
 		await C3HTTPRequest.request(
 			"https://example.com", PackedStringArray(["X-Custom: value"])
 		)
 		assert_eq(
-			impl.call_log[0]["custom_headers"],
+			mock.calls[0]["headers"],
 			PackedStringArray(["X-Custom: value"])
 		)
 
@@ -78,7 +48,7 @@ class TestRequest extends GutTest:
 			C3HTTPRequest.Method.POST,
 			"hello"
 		)
-		assert_eq(impl.call_log[0]["request_data"], "hello")
+		assert_eq(mock.calls[0]["body"], "hello")
 
 	func test_request_raw_data_forwarded() -> void:
 		var body := PackedByteArray([0, 1, 2, 255])
@@ -88,11 +58,11 @@ class TestRequest extends GutTest:
 			C3HTTPRequest.Method.POST,
 			body
 		)
-		assert_eq(impl.call_log[0]["request_data"], body)
+		assert_eq(mock.calls[0]["body"], body)
 
 	func test_request_raw_default_method_is_post() -> void:
 		await C3HTTPRequest.request_raw("https://example.com")
-		assert_eq(impl.call_log[0]["method"], HTTPClient.METHOD_POST)
+		assert_eq(mock.calls[0]["method"], HTTPClient.METHOD_POST)
 
 	func test_request_raw_method_forwarded() -> void:
 		await C3HTTPRequest.request_raw(
@@ -101,14 +71,14 @@ class TestRequest extends GutTest:
 			C3HTTPRequest.Method.PUT,
 			PackedByteArray([1, 2, 3])
 		)
-		assert_eq(impl.call_log[0]["method"], HTTPClient.METHOD_PUT)
+		assert_eq(mock.calls[0]["method"], HTTPClient.METHOD_PUT)
 
 	func test_request_raw_headers_forwarded() -> void:
 		await C3HTTPRequest.request_raw(
 			"https://example.com", PackedStringArray(["X-Custom: value"])
 		)
 		assert_eq(
-			impl.call_log[0]["custom_headers"],
+			mock.calls[0]["headers"],
 			PackedStringArray(["X-Custom: value"])
 		)
 
@@ -122,11 +92,11 @@ class TestRequest extends GutTest:
 			PackedByteArray(),
 			opts
 		)
-		assert_eq(impl.call_log[0]["options"], opts)
+		assert_eq(mock.calls[0]["options"], opts)
 
 	func test_null_options_uses_defaults() -> void:
 		await C3HTTPRequest.request("https://example.com")
-		var opts: C3HTTPRequest.Options = impl.call_log[0]["options"]
+		var opts: C3HTTPRequest.Options = mock.calls[0]["options"]
 		assert_is(opts, C3HTTPRequest.Options)
 		assert_eq(opts.timeout, 0.0)
 		assert_eq(opts.max_redirects, 8)
@@ -144,7 +114,7 @@ class TestRequest extends GutTest:
 			"",
 			opts
 		)
-		assert_eq(impl.call_log[0]["options"], opts)
+		assert_eq(mock.calls[0]["options"], opts)
 
 	func test_use_threads_forwarded_to_impl() -> void:
 		var opts := C3HTTPRequest.Options.new()
@@ -156,7 +126,7 @@ class TestRequest extends GutTest:
 			"",
 			opts
 		)
-		var forwarded: C3HTTPRequest.Options = impl.call_log[0]["options"]
+		var forwarded: C3HTTPRequest.Options = mock.calls[0]["options"]
 		assert_true(forwarded.use_threads)
 
 	func test_on_progress_forwarded_to_impl() -> void:
@@ -170,7 +140,7 @@ class TestRequest extends GutTest:
 			"",
 			opts
 		)
-		var forwarded: C3HTTPRequest.Options = impl.call_log[0]["options"]
+		var forwarded: C3HTTPRequest.Options = mock.calls[0]["options"]
 		assert_eq(forwarded.on_progress, sink)
 
 	func test_on_status_changed_forwarded_to_impl() -> void:
@@ -184,7 +154,7 @@ class TestRequest extends GutTest:
 			"",
 			opts
 		)
-		var forwarded: C3HTTPRequest.Options = impl.call_log[0]["options"]
+		var forwarded: C3HTTPRequest.Options = mock.calls[0]["options"]
 		assert_eq(forwarded.on_status_changed, sink)
 
 	func test_proxy_options_forwarded_to_impl() -> void:
@@ -200,54 +170,52 @@ class TestRequest extends GutTest:
 			"",
 			opts
 		)
-		var forwarded: C3HTTPRequest.Options = impl.call_log[0]["options"]
+		var forwarded: C3HTTPRequest.Options = mock.calls[0]["options"]
 		assert_eq(forwarded.http_proxy_host, "http.proxy.example")
 		assert_eq(forwarded.http_proxy_port, 8080)
 		assert_eq(forwarded.https_proxy_host, "https.proxy.example")
 		assert_eq(forwarded.https_proxy_port, 8443)
 
 	func test_2xx_response_is_ok() -> void:
-		impl.preset.ok = true
-		impl.preset.status = 200
+		mock.stub().ok()
 		var res := await C3HTTPRequest.request("https://example.com")
 		assert_true(res.ok)
 
 	func test_body_on_success() -> void:
-		impl.preset.ok = true
-		impl.preset.body = "hello".to_utf8_buffer()
+		var preset := C3HTTPRequest.Response.new()
+		preset.ok = true
+		preset.body = "hello".to_utf8_buffer()
+		mock.stub().returns(preset)
 		var res := await C3HTTPRequest.request("https://example.com")
 		assert_eq(res.body, "hello".to_utf8_buffer())
 
 	func test_text_decodes_body() -> void:
-		impl.preset.ok = true
-		impl.preset.body = "hello".to_utf8_buffer()
+		var preset := C3HTTPRequest.Response.new()
+		preset.ok = true
+		preset.body = "hello".to_utf8_buffer()
+		mock.stub().returns(preset)
 		var res := await C3HTTPRequest.request("https://example.com")
 		assert_eq(res.text, "hello")
 
 	func test_status_on_success() -> void:
-		impl.preset.ok = true
-		impl.preset.status = 201
+		mock.stub().ok({}, 201)
 		var res := await C3HTTPRequest.request("https://example.com")
 		assert_eq(res.status, 201)
 
 	func test_failed_response_is_not_ok() -> void:
-		impl.preset.ok = false
-		impl.preset.error = C3HTTPRequest.RequestError.transport(
-			"Could not connect."
-		)
+		mock.stub().fail(C3HTTPRequest.RequestError.transport("Could not connect."))
 		var res := await C3HTTPRequest.request("https://example.com")
 		assert_false(res.ok)
 
 	func test_error_set_on_failure() -> void:
 		var err := C3HTTPRequest.RequestError.transport("Could not connect.")
-		impl.preset.ok = false
-		impl.preset.error = err
+		mock.stub().fail(err)
 		var res := await C3HTTPRequest.request("https://example.com")
 		assert_eq(res.error.kind, C3HTTPRequest.RequestError.Kind.TRANSPORT)
 
 	func test_makes_exactly_one_call() -> void:
 		await C3HTTPRequest.request("https://example.com")
-		assert_eq(impl.call_log.size(), 1)
+		assert_eq(mock.call_count, 1)
 
 
 ## Tests for [C3HTTPRequest.RequestError] factories and formatting.
@@ -455,7 +423,7 @@ class TestCancellationToken extends GutTest:
 		token.cancel()
 		var opts := C3HTTPRequest.Options.new()
 		opts.cancellation_token = token
-		var res: C3HTTPRequest.Response = await C3HTTPRequest._Impl.new().execute(
+		var res: C3HTTPRequest.Response = await C3HTTPRequest._Impl.new()._execute(
 			"https://example.com",
 			PackedStringArray(),
 			HTTPClient.METHOD_GET,
@@ -470,7 +438,7 @@ class TestCancellationToken extends GutTest:
 		token.cancel()
 		var opts := C3HTTPRequest.Options.new()
 		opts.cancellation_token = token
-		var res: C3HTTPRequest.Response = await C3HTTPRequest._Impl.new().execute(
+		var res: C3HTTPRequest.Response = await C3HTTPRequest._Impl.new()._execute(
 			"https://example.com",
 			PackedStringArray(),
 			HTTPClient.METHOD_GET,

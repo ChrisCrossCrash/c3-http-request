@@ -2,7 +2,7 @@ class_name C3HTTPRequest
 ## General-purpose async HTTP client that requires no scene tree.
 ##
 ## Call the static [method request] from anywhere — no [Node] to add or
-## configure. Every call [code]await[/code]s a [Response] carrying
+## configure. Every call [code]await[/code]s a [code]Response[/code] carrying
 ## [member Response.ok] as a single failure check that covers transport
 ## errors, timeouts, and non-2xx statuses alike.
 
@@ -47,7 +47,7 @@ static func request(
 	options: Options = null
 ) -> Response:
 	var opts: Options = options if options != null else Options.new()
-	return await _impl.execute(
+	return await _impl._execute(
 		url, custom_headers, _METHOD_MAP[method], request_data, opts
 	)
 
@@ -67,7 +67,7 @@ static func request_raw(
 	options: Options = null
 ) -> Response:
 	var opts: Options = options if options != null else Options.new()
-	return await _impl.execute(
+	return await _impl._execute(
 		url, custom_headers, _METHOD_MAP[method], request_data_raw, opts
 	)
 
@@ -203,7 +203,7 @@ class Options:
 	## [code]STATUS_BODY[/code], etc. Fires once per change, in every mode
 	## (including SSE), and repeats the cycle for each hop when redirects are
 	## followed. Purely observational: the request's outcome is still reported via
-	## the returned [Response]. Very brief intermediate states may be coalesced.
+	## the returned [code]Response[/code]. Very brief intermediate states may be coalesced.
 	var on_status_changed: Callable = Callable()
 
 
@@ -343,6 +343,135 @@ class CancellationToken:
 		return _cancelled
 
 
+## Canned-response builder returned by [method Mock.stub]. Configure with
+## [method ok], [method fail], or [method returns], then discard — the [code]Mock[/code]
+## retains the stub internally.
+class _Stub:
+	var _url: String
+	var _preset: Response = null
+
+	func _init(url: String) -> void:
+		_url = url
+
+	## Configures a successful response. [param json] is JSON-encoded into
+	## [member Response.body].
+	func ok(json: Dictionary = {}, status: int = 200) -> void:
+		var res := Response.new()
+		res.ok = true
+		res.status = status
+		res.body = JSON.stringify(json).to_utf8_buffer()
+		_preset = res
+
+	## Configures a failure response. Build [param error] with the
+	## [code]RequestError[/code] factory methods ([method RequestError.transport],
+	## [method RequestError.timed_out], etc.) or construct one manually.
+	func fail(error: RequestError) -> void:
+		var res := Response.new()
+		res.ok = false
+		res.error = error
+		res.status = error.status
+		_preset = res
+
+	## Sets a [code]Response[/code] directly, bypassing [method ok] and [method fail].
+	func returns(response: Response) -> void:
+		_preset = response
+
+	func _response() -> Response:
+		return _preset if _preset != null else Response.new()
+
+
+## Test helper that intercepts [method C3HTTPRequest.request] calls.
+## Install with [method install], configure canned responses with [method stub],
+## and inspect recorded calls via [member calls]. Always pair [method install]
+## with [method uninstall] in [code]after_each()[/code]. [br][br]
+## [codeblock]
+## var mock: C3HTTPRequest.Mock
+##
+## func before_each() -> void:
+##     mock = C3HTTPRequest.Mock.new()
+##     mock.install()
+##
+## func after_each() -> void:
+##     mock.uninstall()
+##
+## func test_example() -> void:
+##     mock.stub().ok({"id": 1})
+##     var res := await C3HTTPRequest.request("https://api.example.com/users")
+##     assert_true(res.ok)
+##     assert_eq(mock.last_call["url"], "https://api.example.com/users")
+## [/codeblock]
+class Mock extends _Impl:
+	## Recorded calls in order, newest last. Each entry is a [Dictionary] with
+	## keys [code]url[/code] ([String]), [code]method[/code] ([int],
+	## [code]HTTPClient.METHOD_*[/code]), [code]headers[/code]
+	## ([PackedStringArray]), [code]body[/code] ([Variant]),
+	## and [code]options[/code] ([code]Options[/code]).
+	var calls: Array[Dictionary] = []
+
+	## Total number of calls received since construction or the last [method reset].
+	var call_count: int:
+		get:
+			return calls.size()
+
+	## The most recent call dictionary, or an empty [Dictionary] if no calls
+	## have been made yet.
+	var last_call: Dictionary:
+		get:
+			return calls.back() if not calls.is_empty() else {}
+
+	var _stubs: Array = []
+
+	## Installs this mock as [member C3HTTPRequest._impl].
+	func install() -> void:
+		C3HTTPRequest._impl = self
+
+	## Uninstalls this mock and restores normal request behavior.
+	func uninstall() -> void:
+		C3HTTPRequest._impl = _Impl.new()
+
+	## Returns a stub builder for [param url]. Omit [param url] to create
+	## the catch-all default stub, matched when no URL-specific stub exists.
+	## [br][br]Stubs are evaluated in registration order; the first exact URL
+	## match wins, then the first default stub, then an empty [code]Response[/code].
+	func stub(url: String = "") -> _Stub:
+		var s := _Stub.new(url)
+		_stubs.append(s)
+		return s
+
+	## Clears all recorded calls and registered stubs.
+	func reset() -> void:
+		calls.clear()
+		_stubs.clear()
+
+	func _execute(
+		url: String,
+		custom_headers: PackedStringArray,
+		method: int,
+		request_data: Variant,
+		options: Options,
+		_redirects_left: int = -1,
+		_on_worker: bool = false,
+		_start_ms: int = -1
+	) -> Response:
+		calls.append({
+			"url": url,
+			"method": method,
+			"headers": custom_headers,
+			"body": request_data,
+			"options": options,
+		})
+		return _find_stub(url)._response()
+
+	func _find_stub(url: String) -> _Stub:
+		var fallback: _Stub = null
+		for s: _Stub in _stubs:
+			if s._url == url:
+				return s
+			if s._url == "" and fallback == null:
+				fallback = s
+		return fallback if fallback != null else _Stub.new("")
+
+
 class _Impl:
 	# Worker-thread poll pacing in microseconds (1 ms), mirroring the cadence of
 	# HTTPRequest's threaded mode. Only used when running on a worker thread.
@@ -350,7 +479,7 @@ class _Impl:
 	# is effectively the same as 2000 due to the scheduler's granularity.
 	const _PUMP_DELAY_USEC := 1000
 
-	func execute(
+	func _execute(
 		url: String,
 		custom_headers: PackedStringArray,
 		method: int,
@@ -636,7 +765,7 @@ class _Impl:
 				var redirect_headers := _strip_auth_if_cross_origin(
 					custom_headers, parsed, _parse_url(redirect_url)
 				)
-				var redirect_res: Response = await execute(
+				var redirect_res: Response = await _execute(
 					redirect_url,
 					redirect_headers,
 					_redirect_method(method, status),
@@ -677,7 +806,7 @@ class _Impl:
 		return res
 
 	# Yields between polls. On a worker thread it sleeps briefly and returns
-	# synchronously — the await never suspends, so execute() runs straight through
+	# synchronously — the await never suspends, so _execute() runs straight through
 	# on the worker. On the main thread it yields to the next frame, keeping it
 	# responsive.
 	func _pump(tree: SceneTree, on_worker: bool) -> void:
@@ -686,9 +815,9 @@ class _Impl:
 		else:
 			await tree.process_frame
 
-	# Runs execute() on a dedicated background thread (polling at OS speed) and
+	# Runs _execute() on a dedicated background thread (polling at OS speed) and
 	# awaits its completion on the main thread, leaving the public await API
-	# unchanged. The worker re-enters execute() with _on_worker = true.
+	# unchanged. The worker re-enters _execute() with _on_worker = true.
 	func _run_threaded(
 		url: String,
 		custom_headers: PackedStringArray,
@@ -710,7 +839,7 @@ class _Impl:
 		var thread := Thread.new()
 		thread.start(
 			func() -> Response:
-				return await execute(
+				return await _execute(
 					url,
 					custom_headers,
 					method,
@@ -731,7 +860,7 @@ class _Impl:
 		assert(
 			result is Response,
 			"C3HTTPRequest: threaded worker suspended; the worker path must run "
-			+ "synchronously (see _pump). Did a new await get added to execute()?"
+			+ "synchronously (see _pump). Did a new await get added to _execute()?"
 		)
 		var res: Response = result
 		if has_observers:

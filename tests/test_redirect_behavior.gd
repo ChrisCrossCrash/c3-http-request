@@ -236,13 +236,13 @@ class _StartMsCapturingImpl extends C3HTTPRequest._Impl:
 		return _seen.size()
 
 
-# Runs the first execute() call normally but returns a transport error for every
+# Runs the first _execute() call normally but returns a transport error for every
 # subsequent call (i.e. redirect follow-up hops). Simulates a connection failure
 # on the redirected URL without needing an actual unroutable target.
 class _FailOnSecondHopImpl extends C3HTTPRequest._Impl:
 	var _hop := 0
 
-	func execute(
+	func _execute(
 		url: String,
 		custom_headers: PackedStringArray,
 		method: int,
@@ -259,7 +259,7 @@ class _FailOnSecondHopImpl extends C3HTTPRequest._Impl:
 					"Simulated connection failure on redirect target."
 				)
 			)
-		return await super.execute(
+		return await super._execute(
 			url, custom_headers, method, request_data, options,
 			_redirects_left, _on_worker
 		)
@@ -289,7 +289,7 @@ class TestRedirectCrossOriginHeaders extends GutTest:
 			C3HTTPRequest
 			._Impl
 			.new()
-			.execute(
+			._execute(
 				"http://127.0.0.1:%d/" % redir_port,
 				PackedStringArray(["Authorization: Bearer secret"]),
 				HTTPClient.METHOD_GET,
@@ -315,7 +315,7 @@ class TestRedirectCrossOriginHeaders extends GutTest:
 			C3HTTPRequest
 			._Impl
 			.new()
-			.execute(
+			._execute(
 				"http://127.0.0.1:%d/" % redir_port,
 				PackedStringArray(["X-Custom: my-value"]),
 				HTTPClient.METHOD_GET,
@@ -350,7 +350,7 @@ class TestRedirectSameOriginHeaders extends GutTest:
 			C3HTTPRequest
 			._Impl
 			.new()
-			.execute(
+			._execute(
 				"http://127.0.0.1:%d/" % p,
 				PackedStringArray(["Authorization: Bearer secret"]),
 				HTTPClient.METHOD_GET,
@@ -389,7 +389,7 @@ class TestRedirectTimeoutClock extends GutTest:
 		var opts := C3HTTPRequest.Options.new()
 		opts.timeout = 5.0
 
-		await impl.execute(
+		await impl._execute(
 			"http://127.0.0.1:%d/" % p,
 			PackedStringArray(),
 			HTTPClient.METHOD_GET,
@@ -435,7 +435,7 @@ class TestRedirectDownloadFileCleanup extends GutTest:
 		var opts := C3HTTPRequest.Options.new()
 		opts.download_file = _DOWNLOAD_PATH
 
-		var res: C3HTTPRequest.Response = await impl.execute(
+		var res: C3HTTPRequest.Response = await impl._execute(
 			"http://127.0.0.1:%d/" % redir_port,
 			PackedStringArray(),
 			HTTPClient.METHOD_GET,
