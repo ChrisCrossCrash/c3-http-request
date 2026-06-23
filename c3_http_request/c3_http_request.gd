@@ -941,6 +941,10 @@ class _Impl:
 				var redirect_headers := _strip_auth_if_cross_origin(
 					custom_headers, parsed, _parse_url(redirect_url)
 				)
+				# Release this hop's connection before following the redirect.
+				# Without this, the coroutine frame keeps client alive — and the
+				# server-side slot occupied — for the entire remaining chain.
+				client.close()
 				var redirect_res: Response = await request(
 					redirect_url,
 					redirect_headers,
