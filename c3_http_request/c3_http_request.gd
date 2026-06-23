@@ -433,6 +433,9 @@ class Session:
 		]
 		return "%s:%d:%s:%d:%s" % [host, port, str(tls), tls_id, proxy]
 
+	## Returns a connected, non-expired client for [param key], or
+	## [code]null[/code] if none is available. Stale or disconnected entries
+	## encountered during the search are discarded.
 	func checkout(key: String) -> HTTPClient:
 		_mutex.lock()
 		if not _pool.has(key):
@@ -454,6 +457,9 @@ class Session:
 		_mutex.unlock()
 		return result
 
+	## Returns [param client] to the pool under [param key].
+	## If the pool is at [member max_connections_per_host] capacity,
+	## the oldest idle entry is closed and evicted.
 	func checkin(key: String, client: HTTPClient) -> void:
 		_mutex.lock()
 		if not _pool.has(key):
