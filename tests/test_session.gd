@@ -217,3 +217,43 @@ class TestOptionsSessionDefault extends GutTest:
 	func test_session_default_is_null() -> void:
 		var opts := C3HTTPRequest.Options.new()
 		assert_null(opts.session)
+
+
+## Tests for honoring a "Connection: close" response header, which gates whether a
+## connection is returned to the pool after a request completes.
+class TestConnectionCloseHeader extends GutTest:
+	var impl: C3HTTPRequest._Impl
+
+	func before_each() -> void:
+		impl = C3HTTPRequest._Impl.new()
+
+	func test_no_connection_header_keeps_alive() -> void:
+		assert_false(impl._connection_close_requested(
+			PackedStringArray(["Content-Type: text/plain"])
+		))
+
+	func test_keep_alive_value_keeps_alive() -> void:
+		assert_false(impl._connection_close_requested(
+			PackedStringArray(["Connection: keep-alive"])
+		))
+
+	func test_close_value_requests_close() -> void:
+		assert_true(impl._connection_close_requested(
+			PackedStringArray(["Connection: close"])
+		))
+
+	func test_close_match_is_case_insensitive() -> void:
+		assert_true(impl._connection_close_requested(
+			PackedStringArray(["Connection: Close"])
+		))
+
+	func test_close_among_multiple_tokens_requests_close() -> void:
+		assert_true(impl._connection_close_requested(
+			PackedStringArray(["Connection: keep-alive, close"])
+		))
+
+	func test_close_substring_token_does_not_match() -> void:
+		# "close-something" is a distinct token and must not be read as "close".
+		assert_false(impl._connection_close_requested(
+			PackedStringArray(["Connection: close-something"])
+		))
