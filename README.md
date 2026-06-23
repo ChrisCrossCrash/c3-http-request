@@ -43,6 +43,7 @@ No node, no signal, no tree — and `res.ok` is a single check that already acco
 | Parsed `json` body accessor             |                                    ✓                                     |              —               |
 | Server-Sent Events (SSE) streaming      |                                    ✓                                     |              —               |
 | Typed `RequestError` with `Kind`        |                                    ✓                                     |   — (integer result code)    |
+| Built-in test mock                      |                                    ✓                                     |              —               |
 | HTTP keep-alive and connection reuse    | [coming soon](https://github.com/ChrisCrossCrash/c3-http-request/pull/6) |              —               |
 | Cancellation                            |                              ✓ Token-based                               |     ✓ `cancel_request()`     |
 | Timeout                                 |                                    ✓                                     |              ✓               |
@@ -57,7 +58,6 @@ No node, no signal, no tree — and `res.ok` is a single check that already acco
 | Download progress events                |                                    ✓                                     |              ✓               |
 | Connection status callback              |                                    ✓                                     | ✓ `get_http_client_status()` |
 | Threaded requests (off main loop)       |                                    ✓                                     |              ✓               |
-| Built-in test mock                      |                                    ✓                                     |              —               |
 
 ## Benchmarks
 
