@@ -250,7 +250,8 @@ class _FailOnSecondHopImpl extends C3HTTPRequest._Impl:
 		options: C3HTTPRequest.Options,
 		_redirects_left: int = -1,
 		_on_worker: bool = false,
-		_start_ms: int = -1
+		_start_ms: int = -1,
+		_force_fresh: bool = false
 	) -> C3HTTPRequest.Response:
 		_hop += 1
 		if _hop > 1:

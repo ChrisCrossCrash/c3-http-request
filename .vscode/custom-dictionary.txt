@@ -21,6 +21,7 @@ dall
 dalle
 deadzone
 deepdml
+desync
 elif
 floori
 fmod
@@ -68,6 +69,7 @@ softprops
 speaches
 stylebox
 subdirs
+tokenwise
 tscn
 tweens
 undecoded

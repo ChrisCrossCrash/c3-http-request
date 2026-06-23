@@ -257,3 +257,43 @@ class TestConnectionCloseHeader extends GutTest:
 		assert_false(impl._connection_close_requested(
 			PackedStringArray(["Connection: close-something"])
 		))
+
+
+## Tests for which methods are safe to replay when a reused pooled connection
+## dies before any response arrives. Methods are HTTPClient.METHOD_* values, as
+## seen inside _execute() (translated from the addon Method enum via _METHOD_MAP).
+##
+## Only the method gating is unit-tested here: the end-to-end reuse/retry flow is
+## not exercisable in this suite, which avoids live HTTP by design and cannot mock
+## HTTPClient. The flow itself was verified manually against a synthetic server
+## that closes a pooled connection between checkout and use, across the cooperative
+## and use_threads paths, redirect-after-retry, SSE-after-retry, and reuse edge
+## cases (HEAD with Content-Length, 204, trailing-byte desync, concurrent checkout
+## on one Session, gzip and POST over reuse). All passed; see the PR for steps:
+## https://github.com/ChrisCrossCrash/c3-http-request/pull/6
+class TestRetrySafeMethods extends GutTest:
+	var impl: C3HTTPRequest._Impl
+
+	func before_each() -> void:
+		impl = C3HTTPRequest._Impl.new()
+
+	func test_get_is_safe() -> void:
+		assert_true(impl._is_safe_to_retry(HTTPClient.METHOD_GET))
+
+	func test_head_is_safe() -> void:
+		assert_true(impl._is_safe_to_retry(HTTPClient.METHOD_HEAD))
+
+	func test_options_is_safe() -> void:
+		assert_true(impl._is_safe_to_retry(HTTPClient.METHOD_OPTIONS))
+
+	func test_post_is_not_safe() -> void:
+		assert_false(impl._is_safe_to_retry(HTTPClient.METHOD_POST))
+
+	func test_put_is_not_safe() -> void:
+		assert_false(impl._is_safe_to_retry(HTTPClient.METHOD_PUT))
+
+	func test_delete_is_not_safe() -> void:
+		assert_false(impl._is_safe_to_retry(HTTPClient.METHOD_DELETE))
+
+	func test_patch_is_not_safe() -> void:
+		assert_false(impl._is_safe_to_retry(HTTPClient.METHOD_PATCH))

@@ -546,7 +546,8 @@ class Mock extends _Impl:
 		options: Options,
 		_redirects_left: int = -1,
 		_on_worker: bool = false,
-		_start_ms: int = -1
+		_start_ms: int = -1,
+		_force_fresh: bool = false
 	) -> Response:
 		calls.append({
 			"url": url,
@@ -631,7 +632,8 @@ class _Impl:
 		options: Options,
 		_redirects_left: int = -1,
 		_on_worker: bool = false,
-		_start_ms: int = -1
+		_start_ms: int = -1,
+		_force_fresh: bool = false
 	) -> Response:
 		# options.use_threads is read exactly once — here — to decide whether to
 		# spawn a worker. Every downstream poll and dispatch decision uses _on_worker
@@ -674,7 +676,12 @@ class _Impl:
 			pool_key = options.session._make_key(
 				parsed["host"], parsed["port"], parsed["tls"], options.tls_options, options
 			)
-			var pooled: HTTPClient = options.session.checkout(pool_key)
+			# A retry after a silent reuse failure forces a fresh connection: skip
+			# checkout (so we never hand back another pooled socket) but keep pool_key
+			# so the new connection is still checked in on success.
+			var pooled: HTTPClient = (
+				null if _force_fresh else options.session.checkout(pool_key)
+			)
 			if pooled != null:
 				client = pooled
 				reusing = true
@@ -743,6 +750,18 @@ class _Impl:
 			await _pump(tree, _on_worker)
 
 		if not client.has_response():
+			# A pooled connection the server closed silently between checkout and use
+			# surfaces here: request() buffered locally, then the socket was already
+			# dead. Retry once on a fresh connection for methods safe to replay — once
+			# the request was sent, a body-bearing method may have been processed, so
+			# only bodyless-idempotent methods qualify (matches Go net/http).
+			# _force_fresh makes the child skip the pool, so it cannot loop. start_ms
+			# carries through to preserve the original deadline.
+			if reusing and _is_safe_to_retry(method):
+				return await _execute(
+					url, custom_headers, method, request_data, options,
+					redirects_left, _on_worker, start_ms, true
+				)
 			return _fail(RequestError.transport("No response received."))
 
 		var status := client.get_response_code()
@@ -1208,6 +1227,18 @@ class _Impl:
 			if token.strip_edges().to_lower() == "close":
 				return true
 		return false
+
+	# Methods safe to replay on a fresh connection after a reused connection died
+	# before any response. Restricted to the bodyless-idempotent methods (matching
+	# Go's net/http): once the request was sent, a body-bearing method may already
+	# have been processed by the server, so it must not be auto-retried. The method
+	# here is an HTTPClient.METHOD_* value (translated via _METHOD_MAP).
+	func _is_safe_to_retry(method: int) -> bool:
+		return method in [
+			HTTPClient.METHOD_GET,
+			HTTPClient.METHOD_HEAD,
+			HTTPClient.METHOD_OPTIONS,
+		]
 
 	# Merges the caller's headers with the gzip opt-in. Our Accept-Encoding is added
 	# only when accept_gzip is on, the request isn't an SSE stream, and the caller
