@@ -13,23 +13,6 @@ class TestSessionPool extends GutTest:
 	func test_checkout_returns_null_on_empty_pool() -> void:
 		assert_null(session.checkout("key"))
 
-	func test_checkin_then_checkout_returns_same_client() -> void:
-		var client := HTTPClient.new()
-		client.connect_to_host("127.0.0.1", 9)  # instantly STATUS_RESOLVING / CONNECTING
-		# Force the client into a STATUS_CONNECTED-like state for pool tests by
-		# treating it as an already-connected entry. Since we can't mock status
-		# without a live server, we test the round-trip via the raw pool arrays.
-		session._pool["key"] = []
-		var entry := C3HTTPRequest.Session._PoolEntry.new()
-		entry.client = client
-		entry.checked_in_at_msec = Time.get_ticks_msec()
-		session._pool["key"].push_back(entry)
-		# Manually force the status so checkout's health check passes
-		# (we inject directly into _pool to bypass checkin's live-status gate).
-		# Verify that the same object comes back.
-		var got: HTTPClient = session._pool["key"].pop_back().client
-		assert_eq(got, client)
-
 	func test_checkout_returns_null_after_entry_consumed() -> void:
 		session.checkin("key", HTTPClient.new())
 		# The entry won't pass the STATUS_CONNECTED check on a never-connected client,
@@ -38,9 +21,13 @@ class TestSessionPool extends GutTest:
 		assert_false(session._pool.has("key"))
 
 	func test_checkin_adds_to_pool() -> void:
-		session.checkin("key", HTTPClient.new())
+		var client := HTTPClient.new()
+		session.checkin("key", client)
 		assert_true(session._pool.has("key"))
 		assert_eq(session._pool["key"].size(), 1)
+		# The exact client object is stored under the key, not a copy.
+		var entry: C3HTTPRequest.Session._PoolEntry = session._pool["key"][0]
+		assert_eq(entry.client, client)
 
 	func test_checkin_multiple_same_key() -> void:
 		session.checkin("key", HTTPClient.new())
