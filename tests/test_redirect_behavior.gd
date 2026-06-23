@@ -262,7 +262,7 @@ class _FailOnSecondHopImpl extends C3HTTPRequest._Impl:
 			)
 		return await super.request(
 			url, custom_headers, method, request_data, options,
-			_redirects_left, _on_worker
+			_redirects_left, _on_worker, _start_ms, _force_fresh
 		)
 
 
