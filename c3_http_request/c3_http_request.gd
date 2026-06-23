@@ -937,9 +937,22 @@ class _Impl:
 						DirAccess.remove_absolute(options.download_file)
 				return redirect_res
 
+		# Pool the connection for reuse only when the transport is still connected
+		# AND the server has not asked us to close it. Honoring a "Connection: close"
+		# response header is essential: servers cap keep-alive connections by age or
+		# request count and announce the final response with "close" while the socket
+		# is still momentarily readable (STATUS_CONNECTED). Pooling it anyway hands the
+		# next request a connection the server is tearing down — a "No response
+		# received" failure on reuse.
 		if options.session != null and not pool_key.is_empty():
-			if client.get_status() == HTTPClient.STATUS_CONNECTED:
+			var keep_alive := (
+				client.get_status() == HTTPClient.STATUS_CONNECTED
+				and not _connection_close_requested(resp_headers)
+			)
+			if keep_alive:
 				options.session.checkin(pool_key, client)
+			else:
+				client.close()
 
 		var res := Response.new()
 		res.status = status
@@ -1182,6 +1195,19 @@ class _Impl:
 			if header.to_lower().begins_with(prefix):
 				return header.substr(prefix.length()).strip_edges()
 		return ""
+
+	# True when the response's Connection header carries the "close" token, meaning
+	# the server will drop the socket after this response and it must not be pooled.
+	# The header is a comma-separated token list, so match tokenwise rather than by
+	# substring (a value like "close-something" must not count).
+	func _connection_close_requested(headers: PackedStringArray) -> bool:
+		var value := _header_value(headers, "Connection")
+		if value.is_empty():
+			return false
+		for token: String in value.split(","):
+			if token.strip_edges().to_lower() == "close":
+				return true
+		return false
 
 	# Merges the caller's headers with the gzip opt-in. Our Accept-Encoding is added
 	# only when accept_gzip is on, the request isn't an SSE stream, and the caller
