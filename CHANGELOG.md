@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-06-24
+
+### Added
+
+- `Response.sse_retry_ms` — the server's last SSE `retry:` value (suggested reconnect backoff, in milliseconds), or `-1` when the stream sent none or the response was not an SSE stream.
+
+### Changed
+
+- **Breaking:** the `Options.on_sse_event` callback now receives a third argument, `last_event_id: String`, so its signature is `on_sse_event.call(data, event_type, last_event_id)`. Existing two-argument sinks must add the parameter. `last_event_id` is the stream's `id:` cursor and persists across events per the SSE spec — an event with no `id:` line still reports the most recent one. Together with `Response.sse_retry_ms`, this gives a caller everything needed to reconnect a dropped stream (echo the id as a `Last-Event-ID` header after waiting the suggested backoff); the client still does not auto-reconnect itself.
+
 ## [0.3.1] - 2026-06-22
 
 ### Added

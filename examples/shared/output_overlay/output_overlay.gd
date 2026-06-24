@@ -19,3 +19,13 @@ func print_with_overlay(...args: Array) -> void:
 	else:
 		add_text(line + "\n")
 	print(line)
+
+
+## Prints a single BBCode-tagged line, rendered with its tags both on screen
+## (via [method append_text]) and in the terminal (via [method print_rich]) — for
+## lines that must stand out from ordinary output. Pass already-tagged text, e.g.
+## [code]"[color=yellow]heads up[/color]"[/code]. Unlike [method print_with_overlay],
+## the tags are always parsed, so plain brackets in the argument are not safe here.
+func print_rich_with_overlay(bbcode: String) -> void:
+	append_text(bbcode + "\n")
+	print_rich(bbcode)
