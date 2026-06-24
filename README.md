@@ -75,7 +75,7 @@ Threaded mode and uncapped runs are RTT- or bandwidth-limited, so the clients ar
 
 ## Compatibility
 
-Tested on Godot 4.6.x with automated ([GUT](https://github.com/bitwes/Gut)) and manual tests. Manually verified to work back to Godot 4.2.0.
+Tested on Godot 4.7.x with automated ([GUT](https://github.com/bitwes/Gut)) and manual tests. Manually verified to work back to Godot 4.2.0.
 
 ## Installation
 
