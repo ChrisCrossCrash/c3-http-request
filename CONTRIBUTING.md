@@ -261,16 +261,17 @@ To cut a release (e.g. `v0.2.0`):
 4. Commit the version bump and changelog to `main`.
 5. Create an annotated tag matching `VERSION`, using the changelog section as the tag body so `git show v0.2.0` carries the same notes:
 
-   ```bash
-   git tag -a v0.2.0 --cleanup=whitespace -m "v0.2.0" -m "$(python scripts/extract_changelog.py v0.2.0)"
-   ```
+    ```bash
+    git tag -a v0.2.0 --cleanup=whitespace -m "v0.2.0" -m "$(python scripts/extract_changelog.py v0.2.0)"
+    ```
 
-   `--cleanup=whitespace` is required because the changelog's `### Added` / `### Changed` subheadings start with `#`; without it, `git tag`'s default `strip` cleanup would delete those lines as if they were comments.
+    `--cleanup=whitespace` is required because the changelog's `### Added` / `### Changed` subheadings start with `#`; without it, `git tag`'s default `strip` cleanup would delete those lines as if they were comments.
 
-   Then push the branch and the tag together — the tag push triggers the release workflow:
+    Then push the branch and the tag together — the tag push triggers the release workflow:
 
-   ```bash
-   git push origin main v0.2.0
-   ```
+    ```bash
+    git push origin main v0.2.0
+    ```
+
 6. After the workflow succeeds, update the [Godot Asset Store](https://store.godotengine.org/asset/c3designs/c3-http-request/manage/) by uploading the new release bundle.
 7. After the release is approved, update the detailed description for the asset to match the latest version's features and changes. The Asset Store's detailed description has special formatting requirements, so use the `/asset-store-description` Claude custom command to regenerate it from `README.md` (or just follow the steps outlined in [.claude/commands/asset-store-description.md](.claude/commands/asset-store-description.md)). Then upload the regenerated file to the Asset Store.
