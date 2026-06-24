@@ -154,7 +154,13 @@ class Options:
 	var download_file: String = ""
 	## TLS options for HTTPS connections. [code]null[/code] uses
 	## [method TLSOptions.client] (validates the server certificate). Override
-	## with [method TLSOptions.client_unsafe] for self-signed certificates.
+	## with [method TLSOptions.client_unsafe] for self-signed certificates. [br][br]
+	## If you set a [member session], leaving this [code]null[/code] (the default)
+	## needs no extra thought — pooling just works. But if you [i]do[/i] set a
+	## custom [TLSOptions], you must reuse the same instance for every call that
+	## shares the session: connections are pooled by this object's identity, so a
+	## newly constructed [TLSOptions] per request produces a different pool key
+	## each time and silently defeats connection reuse.
 	var tls_options: TLSOptions = null
 	## Host of an HTTP proxy to route plain [code]http://[/code] requests through.
 	## Empty means a direct connection for HTTP. Has no effect on [code]https://[/code]
@@ -214,7 +220,11 @@ class Options:
 	## latency for repeated requests to the same endpoint. [br][br]
 	## [code]null[/code] (the default) disables pooling: each call opens a fresh
 	## connection. Create a [Session] once and share it across calls that target
-	## the same set of hosts.
+	## the same set of hosts. [br][br]
+	## If you also set a custom [member tls_options], share that one [TLSOptions]
+	## instance across the pooled calls too, or connection reuse is defeated. The
+	## default [code]null[/code] [member tls_options] needs no such care. See
+	## [member tls_options].
 	var session: Session = null
 
 
