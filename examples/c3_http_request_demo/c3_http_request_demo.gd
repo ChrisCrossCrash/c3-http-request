@@ -3,6 +3,10 @@ extends Node
 # How many Server-Sent Events to collect before cancelling the stream.
 const SSE_EVENT_COUNT := 10
 
+# The output overlay wraps lines past this width, so SSE event lines (indent +
+# "[message] " prefix + title) are truncated to fit on one line.
+const SSE_LINE_MAX_LEN := 112
+
 @onready var output_overlay: OutputOverlay = $CanvasLayer/OutputOverlay
 
 
@@ -213,32 +217,68 @@ func demo_sse() -> void:
 	output_overlay.print_with_overlay("\n--- Server-Sent Events ---")
 	# Wikimedia EventStreams is a real, public, never-ending SSE feed of recent
 	# wiki edits (https://stream.wikimedia.org). Setting Options.on_sse_event parses
-	# the response as a stream and fires the callback per event; the await below
-	# resolves only once the stream closes. Since the feed never ends, we cancel
-	# the token from inside the callback after SSE_EVENT_COUNT events — the same
-	# mechanism used to tear down any long-lived stream.
+	# the response as a stream and fires the callback per event; the await resolves
+	# only once the stream closes. Since the feed never ends, we cancel the token
+	# from inside the callback after SSE_EVENT_COUNT events to keep the demo bounded.
+	#
+	# The while loop is a reconnect loop: SSE connections are routinely severed
+	# (servers and proxies often cap a response at 30-60 s), and a long-lived
+	# consumer is expected to resume by echoing the last event's id back as a
+	# Last-Event-ID header after waiting the server's suggested retry backoff. In
+	# practice the reconnect branch won't fire here — Wikimedia doesn't cap
+	# connection time, so a single connection delivers all SSE_EVENT_COUNT events
+	# before we cancel — but the loop shows the shape a production consumer needs.
+	#
+	# Single-element Arrays so the callback's writes are visible out here: GDScript
+	# lambdas capture value types (like an int or String) by copy, but Array by
+	# reference.
 	var token := C3HTTPRequest.CancellationToken.new()
-	var opts := C3HTTPRequest.Options.new()
-	opts.cancellation_token = token
-	# A single-element Array so the callback's mutation is visible out here:
-	# lambdas capture value types (like an int) by copy, but Array by reference.
+	var last_id := [""]
 	var counter := [0]
-	opts.on_sse_event = func(data: String, event_type: String) -> void:
-		counter[0] += 1
-		var title := "?"
-		var parsed: Variant = JSON.parse_string(data)
-		if parsed is Dictionary:
-			title = str(parsed.get("title", "?"))
-		output_overlay.print_with_overlay("event %d [%s]: %s" % [counter[0], event_type, title])
+	var res: C3HTTPRequest.Response = null
+	while true:
+		var headers := PackedStringArray([
+			"User-Agent: c3-http-request-demo (https://github.com)"
+		])
+		if not last_id[0].is_empty():
+			headers.append("Last-Event-ID: " + last_id[0])
+		var opts := C3HTTPRequest.Options.new()
+		opts.cancellation_token = token
+		opts.on_sse_event = func(data: String, event_type: String, id: String) -> void:
+			last_id[0] = id  # remember where to resume from
+			counter[0] += 1
+			var title := "?"
+			var parsed: Variant = JSON.parse_string(data)
+			if parsed is Dictionary:
+				title = str(parsed.get("title", "?"))
+			# Indent event lines two spaces so they read as a block, set apart from
+			# the reconnect notices below even without relying on color.
+			var line := "  [%s] %s" % [event_type, title]
+			if line.length() > SSE_LINE_MAX_LEN:
+				line = line.substr(0, SSE_LINE_MAX_LEN - 1) + "…"
+			output_overlay.print_with_overlay(line)
+			if counter[0] >= SSE_EVENT_COUNT:
+				token.cancel()
+		res = await C3HTTPRequest.request(
+			"https://stream.wikimedia.org/v2/stream/recentchange",
+			headers,
+			C3HTTPRequest.Method.GET,
+			"",
+			opts
+		)
+		# We hit our quota and cancelled on purpose — stop, don't reconnect.
 		if counter[0] >= SSE_EVENT_COUNT:
-			token.cancel()
-	var res := await C3HTTPRequest.request(
-		"https://stream.wikimedia.org/v2/stream/recentchange",
-		PackedStringArray(["User-Agent: c3-http-request-demo (https://github.com)"]),
-		C3HTTPRequest.Method.GET,
-		"",
-		opts
-	)
+			break
+		# The stream closed on its own: honor the server's backoff hint if any,
+		# else fall back, then reconnect from the last id seen.
+		var backoff_ms := res.sse_retry_ms if res.sse_retry_ms >= 0 else 3000
+		# A clean close (EOF on a 2xx) leaves res.error null; avoid printing "<null>".
+		var reason := str(res.error) if res.error != null else "closed"
+		output_overlay.print_rich_with_overlay(
+			"[color=gold]↻ stream ended (%s) — reconnecting in %d ms…[/color]"
+			% [reason, backoff_ms]
+		)
+		await get_tree().create_timer(backoff_ms / 1000.0).timeout
 	# Cancelling is how we chose to end the stream, so ok is false with a
 	# CANCELLED error here — that is the expected, successful outcome.
 	output_overlay.print_with_overlay("received: ", counter[0], " events")

@@ -174,8 +174,12 @@ class Options:
 	## handler. [code]null[/code] means no cancellation support.
 	var cancellation_token: CancellationToken = null
 	## Optional [Callable] invoked once per Server-Sent Event as the response
-	## streams in, as
-	## [code]on_sse_event.call(data: String, event_type: String)[/code]. When set,
+	## streams in, as [code]on_sse_event.call(data: String, event_type: String,
+	## last_event_id: String)[/code]. [code]last_event_id[/code] is the stream's
+	## current [code]id:[/code] cursor: it persists across events per the SSE spec,
+	## so an event with no [code]id:[/code] line still reports the most recent one
+	## (echo it as a [code]Last-Event-ID[/code] header to resume after a drop; see
+	## also [member Response.sse_retry_ms] for the suggested backoff). When set,
 	## a 2xx response body is parsed as an SSE stream rather than collected:
 	## [member Response.body] stays empty and [method C3HTTPRequest.request]
 	## resolves only when the stream closes (use [member cancellation_token] to
@@ -222,6 +226,13 @@ class Response:
 	## Raw response body bytes. Empty when [member Options.download_file] is set
 	## or when no body was received. Use [member text] for a decoded string view.
 	var body: PackedByteArray = PackedByteArray()
+	## The server's last SSE [code]retry:[/code] value, in milliseconds — the
+	## backoff it suggests before reconnecting. [code]-1[/code] when the stream
+	## sent no [code]retry:[/code] line or the response was not an SSE stream. Pair
+	## it with the [code]last_event_id[/code] from [member Options.on_sse_event] to
+	## reconnect: wait this long, then re-request with a [code]Last-Event-ID[/code]
+	## header set to the last id seen.
+	var sse_retry_ms: int = -1
 	## The response body decoded as UTF-8. Computed lazily on first access and
 	## cached, so binary responses never pay the decode cost. Returns
 	## [code]""[/code] for an empty or non-UTF-8 body.
@@ -605,10 +616,15 @@ class _Impl:
 		# caller's sink never runs off-thread; otherwise dispatch directly.
 		var sse_sink := options.on_sse_event
 		if _on_worker and sse_sink.is_valid():
-			sse_sink = func(data: String, event_type: String) -> void:
-				options.on_sse_event.call_deferred(data, event_type)
+			sse_sink = func(data: String, event_type: String, last_event_id: String) -> void:
+				options.on_sse_event.call_deferred(data, event_type, last_event_id)
 		var body_bytes := PackedByteArray()
 		var sse_buffer := PackedByteArray()
+		# Persistent SSE cursors, threaded through the parser for the whole stream:
+		# the last-event-id (surfaced per event) and the server's retry backoff in
+		# ms (surfaced on the final Response). Boxed so the parser can write back.
+		var sse_id := [""]
+		var sse_retry := [-1]
 		var last_recv_ms := start_ms
 		# Content-Length if the server sent one, else -1 (e.g. chunked responses).
 		var total_bytes := client.get_response_body_length()
@@ -644,12 +660,12 @@ class _Impl:
 				return _fail(RequestError.timed_out(
 					"Stream idle for too long." if sse_mode
 					else "Timed out while reading body."
-				))
+				), sse_retry[0])
 			if _cancelled(options):
 				if file != null:
 					file.close()
 					DirAccess.remove_absolute(options.download_file)
-				return _fail(RequestError.cancelled("Request was cancelled."))
+				return _fail(RequestError.cancelled("Request was cancelled."), sse_retry[0])
 			client.poll()
 			last_status = _emit_status_change(
 				client, last_status, options, _on_worker
@@ -671,9 +687,9 @@ class _Impl:
 					return _fail(RequestError.body_size_limit_exceeded(
 						"SSE event exceeded limit of %d bytes."
 						% options.body_size_limit
-					))
+					), sse_retry[0])
 				sse_buffer.append_array(chunk)
-				sse_buffer = _drain_sse_buffer(sse_buffer, sse_sink)
+				sse_buffer = _drain_sse_buffer(sse_buffer, sse_sink, sse_id, sse_retry)
 				continue
 			if file != null:
 				# The limit is applied to bytes written to disk (decompressed),
@@ -738,7 +754,7 @@ class _Impl:
 		if sse_mode:
 			var tail := sse_buffer.get_string_from_utf8()
 			if not tail.strip_edges().is_empty():
-				_emit_sse_event(tail, sse_sink)
+				_emit_sse_event(tail, sse_sink, sse_id, sse_retry)
 
 		if file == null:
 			var decoded: Variant = _maybe_decompress_body(
@@ -784,6 +800,7 @@ class _Impl:
 		res.status = status
 		res.headers = resp_headers
 		res.body = body_bytes if file == null else PackedByteArray()
+		res.sse_retry_ms = sse_retry[0]
 		if status < 200 or status >= 300:
 			res.ok = false
 			var e := RequestError.new()
@@ -1192,11 +1209,14 @@ class _Impl:
 	# [param on_event], and returns the trailing partial bytes (an incomplete
 	# event, possibly mid-character) to keep for the next read.
 	func _drain_sse_buffer(
-		buffer: PackedByteArray, on_event: Callable
+		buffer: PackedByteArray, on_event: Callable, id_box: Array, retry_box: Array
 	) -> PackedByteArray:
 		var bound := _find_sse_boundary(buffer)
 		while bound.x != -1:
-			_emit_sse_event(buffer.slice(0, bound.x).get_string_from_utf8(), on_event)
+			_emit_sse_event(
+				buffer.slice(0, bound.x).get_string_from_utf8(),
+				on_event, id_box, retry_box
+			)
 			buffer = buffer.slice(bound.y)
 			bound = _find_sse_boundary(buffer)
 		return buffer
@@ -1220,12 +1240,18 @@ class _Impl:
 		return Vector2i(-1, -1)
 
 	# Parses one raw SSE event block and, if it carries data, invokes
-	# [param on_event] with (data, event_type). Multiple data: lines are joined
-	# with newlines; event_type defaults to "message" per the SSE spec. Comment
-	# lines (":") and events with no data: lines (bare keep-alives, id-only
-	# blocks) are dropped. The id: and retry: fields are ignored — this client
-	# does not reconnect.
-	func _emit_sse_event(raw_event: String, on_event: Callable) -> void:
+	# [param on_event] with (data, event_type, last_event_id). Multiple data: lines
+	# are joined with newlines; event_type defaults to "message" per the SSE spec.
+	# Comment lines (":") and events with no data: lines (bare keep-alives, id-only
+	# blocks) are dropped. The id: and retry: fields update the persistent
+	# [param id_box] / [param retry_box] cursors even on dropped blocks, so they
+	# carry forward across the stream: id_box[0] is surfaced as last_event_id (for
+	# the caller to echo as Last-Event-ID on reconnect) and retry_box[0] is the
+	# server's suggested backoff in ms (surfaced on the final Response). This
+	# client does not reconnect itself; it only exposes the cursors.
+	func _emit_sse_event(
+		raw_event: String, on_event: Callable, id_box: Array, retry_box: Array
+	) -> void:
 		var data_lines := PackedStringArray()
 		var event_type := "message"
 		for line: String in raw_event.split("\n"):
@@ -1242,12 +1268,33 @@ class _Impl:
 				if value.begins_with(" "):
 					value = value.substr(1)
 				event_type = value
+			elif line.begins_with("id:"):
+				var value := line.substr(3)
+				if value.begins_with(" "):
+					value = value.substr(1)
+				# Per spec, an id value containing a NUL char is ignored entirely.
+				if not value.contains(char(0)):
+					id_box[0] = value
+			elif line.begins_with("retry:"):
+				var value := line.substr(6)
+				if value.begins_with(" "):
+					value = value.substr(1)
+				# retry must be digits only; is_valid_int() also
+				# accepts a leading sign, so exclude it.
+				if value.is_valid_int() and not (
+					value.begins_with("-") or value.begins_with("+")
+				):
+					retry_box[0] = value.to_int()
 		if data_lines.is_empty():
 			return
-		on_event.call("\n".join(data_lines), event_type)
+		on_event.call("\n".join(data_lines), event_type, id_box[0])
 
-	func _fail(error: RequestError) -> Response:
+	func _fail(error: RequestError, sse_retry_ms: int = -1) -> Response:
 		var res := Response.new()
 		res.ok = false
 		res.error = error
+		# Preserve a retry: hint parsed before a stream failed (e.g. idle timeout),
+		# so a reconnecting caller still honors the server's backoff. -1 (the
+		# default) on every non-SSE path leaves the field unset as before.
+		res.sse_retry_ms = sse_retry_ms
 		return res
