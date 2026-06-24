@@ -709,40 +709,20 @@ class _Impl:
 				return conn_err
 		last_status = HTTPClient.STATUS_CONNECTED
 
-		var err: int
-		if request_data is PackedByteArray:
-			err = client.request_raw(
-				method, parsed.path, all_headers, request_data
-			)
-		else:
-			err = client.request(
-				method, parsed.path, all_headers, request_data
-			)
+		var err := _send_request(client, method, parsed, all_headers, request_data)
 		if err != OK:
+			# A send failure on a pooled connection means the socket was dead before
+			# any bytes left the client, so the request was never transmitted: replay
+			# it on a fresh connection regardless of method. _force_fresh makes the
+			# child skip the pool, so it cannot loop; start_ms preserves the deadline.
 			if reusing:
-				# The pooled connection went stale between checkout and use.
-				# Discard it and retry with a fresh connection transparently.
-				client = HTTPClient.new()
-				client.set_read_chunk_size(options.download_chunk_size)
-				reusing = false
-				var retry_err: Variant = await _connect_client(
-					client, parsed, options, start_ms, tree, _on_worker
+				return await _execute(
+					url, custom_headers, method, request_data, options,
+					redirects_left, _on_worker, start_ms, true
 				)
-				if retry_err != null:
-					return retry_err
-				last_status = HTTPClient.STATUS_CONNECTED
-				if request_data is PackedByteArray:
-					err = client.request_raw(
-						method, parsed["path"], all_headers, request_data
-					)
-				else:
-					err = client.request(
-						method, parsed["path"], all_headers, request_data
-					)
-			if err != OK:
-				return _fail(RequestError.transport(
-					"Failed to send request (error %d)." % err
-				))
+			return _fail(RequestError.transport(
+				"Failed to send request (error %d)." % err
+			))
 
 		while true:
 			client.poll()
@@ -1012,6 +992,20 @@ class _Impl:
 				e.message = "Request failed with status %d." % status
 			res.error = e
 		return res
+
+	# Sends the request on [param client], dispatching to request_raw for a
+	# PackedByteArray body and request otherwise. Returns the HTTPClient error code
+	# (OK on success).
+	func _send_request(
+		client: HTTPClient,
+		method: int,
+		parsed: Dictionary,
+		all_headers: PackedStringArray,
+		request_data: Variant
+	) -> int:
+		if request_data is PackedByteArray:
+			return client.request_raw(method, parsed["path"], all_headers, request_data)
+		return client.request(method, parsed["path"], all_headers, request_data)
 
 	# Connects [param client] to the host described by [param parsed], applying
 	# proxies and TLS from [param options], then polls until STATUS_CONNECTED or
