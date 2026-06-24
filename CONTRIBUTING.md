@@ -273,4 +273,4 @@ To cut a release (e.g. `v0.2.0`):
    git push origin main v0.2.0
    ```
 6. After the workflow succeeds, update the [Godot Asset Store](https://store.godotengine.org/asset/c3designs/c3-http-request/manage/) by uploading the new release bundle.
-7. After the release is approved, update the detailed description for the asset to match the latest version's features and changes.
+7. After the release is approved, update the detailed description for the asset to match the latest version's features and changes. The Asset Store's detailed description has special formatting requirements, so use the `/asset-store-description` Claude custom command to regenerate it from `README.md` (or just follow the steps outlined in [.claude/commands/asset-store-description.md](.claude/commands/asset-store-description.md)). Then upload the regenerated file to the Asset Store.
