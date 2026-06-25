@@ -1,3 +1,4 @@
+absolutizing
 ADPCM
 alives
 autofree
@@ -45,6 +46,7 @@ MEDIAPREVIOUS
 MEDIARECORD
 MEDIASTOP
 minf
+minimise
 multibyte
 noto
 NUMLOCK
