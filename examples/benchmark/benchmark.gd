@@ -450,8 +450,7 @@ func _median_ms(samples: Array[int]) -> float:
 	if n == 0:
 		return 0.0
 	samples.sort()
-	@warning_ignore("integer_division")
-	var mid := n / 2
+	var mid := floori(float(n) / 2)
 	if n % 2 == 1:
 		return samples[mid] / 1000.0
 	return (samples[mid - 1] + samples[mid]) / 2.0 / 1000.0
