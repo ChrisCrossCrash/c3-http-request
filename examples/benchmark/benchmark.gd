@@ -11,9 +11,9 @@ extends Node
 ##
 ## Numbers are reported as medians (robust to the occasional GC/scheduler hiccup).
 
-# Base URL of the benchmark server. The local benchmark_server.py listens here by
-# default; change it to a remote host (e.g. "https://api.chriskumm.com") to
-# benchmark over a real network link.
+# Base URL of the benchmark server. This server is configured to not slow-start
+# after long idle periods (net.ipv4.tcp_slow_start_after_idle=0), which is a
+# common but not universal configuration.
 const SERVER_BASE := "https://api.chriskumm.com"
 const LATENCY_URL := SERVER_BASE + "/api/benchmark/ping/"
 const CONCURRENCY_URL := SERVER_BASE + "/api/benchmark/ping/"
@@ -23,13 +23,20 @@ const DOWNLOAD_URL := SERVER_BASE + "/api/benchmark/download/%d/"
 # default) — the control case where no per-frame gate exists.
 const FRAME_CAPS: Array[int] = [0, 120, 60, 30]
 const WARMUPS := 3
-const RUNS := 100
+const RUNS := 25
 # Concurrency benchmark: simultaneous request counts, run at a typical 60 fps.
 const CONCURRENCY_LEVELS: Array[int] = [1, 2, 4, 8]
 # How many times to repeat each batch; the reported figure is the median of
 # these. Odd so the median is a real measured batch, not the mean of two.
 const CONCURRENCY_REPS := 25
 const CONCURRENCY_FPS := 60
+const SLOW_START_SIZES_KB: Array[int] = [
+	10, # Control: fits inside IW10, so no extra RTT is needed.
+	20, # >14.6 KB, so a fresh connection needs an extra RTT, warm session does not.
+	400 # Large: significantly exceeds IW10, so fresh connections need many RTTs.
+]
+const SLOW_START_REPS := 25
+const SLOW_START_FPS := 60
 # File download benchmark: body sizes in MB, streamed to disk, run at 60 fps.
 const DOWNLOAD_SIZES_MB: Array[int] = [1, 8]
 const DOWNLOAD_REPS := 25
@@ -77,23 +84,13 @@ func _ready() -> void:
 	_phase = "starting"
 	_show_status()
 	_print_environment()
-	# Let things settle before starting.
-	# Without this, the first frame often shows as a stutter.
-	await get_tree().create_timer(0.5).timeout
 	await _bench_latency(LATENCY_URL)
 	await _bench_concurrency(CONCURRENCY_URL)
+	await _bench_slow_start()
 	await _bench_download()
 	output_overlay.print_with_overlay("\nDone.")
 	_phase = "Done."
 	_show_status()
-	# The editor's remote debugger forwards print output asynchronously, so quitting
-	# immediately drops the final batch (results + report). Give it time to drain
-	# when attached; a single frame is enough over direct stdout (headless/CLI).
-	if EngineDebugger.is_active():
-		await get_tree().create_timer(0.5).timeout
-	else:
-		await get_tree().process_frame
-	get_tree().quit()
 
 
 func _process(delta: float) -> void:
@@ -111,7 +108,7 @@ func _process(delta: float) -> void:
 	fps_label.text = "%d fps (actual)" % roundi(fps)
 
 
-# Refreshes the on-screen status from the current [member _phase]. With a client
+# Refreshes the on-screen status from the current _phase. With a client
 # given, a second line names the client and mode of the call now running.
 func _show_status(client := "", threaded := false) -> void:
 	var phase_label := "%s · %s" % [_phase, _server] if not _server.is_empty() else _phase
@@ -164,8 +161,8 @@ func _bench_latency(url: String) -> void:
 		for _i in WARMUPS:
 			await _time_c3(url, false)
 			await _time_c3(url, true)
-			await _time_c3_session(url, session, false)
-			await _time_c3_session(url, session, true)
+			await _time_c3(url, false, session)
+			await _time_c3(url, true, session)
 			await _time_native(url, false)
 			await _time_native(url, true)
 		var c3_coop: Array[int] = []
@@ -179,8 +176,8 @@ func _bench_latency(url: String) -> void:
 		for _i in RUNS:
 			c3_coop.append(await _time_c3(url, false))
 			c3_threaded.append(await _time_c3(url, true))
-			c3_session_coop.append(await _time_c3_session(url, session, false))
-			c3_session_threaded.append(await _time_c3_session(url, session, true))
+			c3_session_coop.append(await _time_c3(url, false, session))
+			c3_session_threaded.append(await _time_c3(url, true, session))
 			native_coop.append(await _time_native(url, false))
 			native_threaded.append(await _time_native(url, true))
 		Engine.max_fps = 0
@@ -206,26 +203,46 @@ func _bench_concurrency(url: String) -> void:
 		+ " (median of %d batches, %d fps) ==" % [CONCURRENCY_REPS, CONCURRENCY_FPS]
 	)
 	Engine.max_fps = CONCURRENCY_FPS
-	output_overlay.print_with_overlay("    N   C3 coop      nat coop     C3 thread    nat thread")
+	# Shared across all N so its pool (up to max_connections_per_host) is warm when
+	# timing starts — this is where keep-alive reuse across the batch should tell.
+	var session := C3HTTPRequest.Session.new()
+	session.max_connections_per_host = CONCURRENCY_LEVELS.max()
+	var headers: PackedStringArray = [
+		"C3 coop", "C3s coop", "nat coop", "C3 thread", "C3s thread", "nat thread"
+	]
+	var header_row := "%5s" % "N"
+	for label: String in headers:
+		header_row += "   %11s" % label
+	output_overlay.print_with_overlay(header_row)
 	for n: int in CONCURRENCY_LEVELS:
 		_phase = "Concurrency · N=%d" % n
 		_show_status()
 		await _time_c3_concurrent(url, n, false)  # warmup
 		await _time_c3_concurrent(url, n, true)
+		await _time_c3_session_concurrent(url, session, n, false)
+		await _time_c3_session_concurrent(url, session, n, true)
 		await _time_native_concurrent(url, n, false)
 		await _time_native_concurrent(url, n, true)
 		var c3_coop: Array[int] = []
 		var c3_threaded: Array[int] = []
+		var c3_session_coop: Array[int] = []
+		var c3_session_threaded: Array[int] = []
 		var native_coop: Array[int] = []
 		var native_threaded: Array[int] = []
 		for _r in CONCURRENCY_REPS:
 			c3_coop.append(await _time_c3_concurrent(url, n, false))
 			c3_threaded.append(await _time_c3_concurrent(url, n, true))
+			c3_session_coop.append(await _time_c3_session_concurrent(url, session, n, false))
+			c3_session_threaded.append(await _time_c3_session_concurrent(url, session, n, true))
 			native_coop.append(await _time_native_concurrent(url, n, false))
 			native_threaded.append(await _time_native_concurrent(url, n, true))
 		output_overlay.print_with_overlay(
-			"%5d   %8.2f ms   %8.2f ms   %8.2f ms   %8.2f ms"
-			% [n, _median_ms(c3_coop), _median_ms(native_coop), _median_ms(c3_threaded), _median_ms(native_threaded)]
+			"%5d   %8.2f ms   %8.2f ms   %8.2f ms   %8.2f ms   %8.2f ms   %8.2f ms"
+			% [
+				n,
+				_median_ms(c3_coop), _median_ms(c3_session_coop), _median_ms(native_coop),
+				_median_ms(c3_threaded), _median_ms(c3_session_threaded), _median_ms(native_threaded)
+			]
 		)
 	Engine.max_fps = 0
 
@@ -233,22 +250,12 @@ func _bench_concurrency(url: String) -> void:
 # --- Single-request timers (microseconds) ---
 
 
-func _time_c3(url: String, use_threads: bool) -> int:
-	_show_status("C3HTTPRequest", use_threads)
-	var opts := C3HTTPRequest.Options.new()
-	opts.use_threads = use_threads
-	var start := Time.get_ticks_usec()
-	var res := await C3HTTPRequest.request(
-		url, _auth_headers, C3HTTPRequest.Method.GET, "", opts
-	)
-	var elapsed := Time.get_ticks_usec() - start
-	if not res.ok:
-		push_error("C3HTTPRequest failed: %s" % str(res.error))
-	return elapsed
-
-
-func _time_c3_session(url: String, session: C3HTTPRequest.Session, use_threads: bool) -> int:
-	_show_status("C3 (session)", use_threads)
+# Times a single C3HTTPRequest call. Pass a session to reuse pooled connections;
+# a null session opens a fresh connection each call.
+func _time_c3(
+	url: String, use_threads: bool, session: C3HTTPRequest.Session = null
+) -> int:
+	_show_status("C3 (session)" if session else "C3HTTPRequest", use_threads)
 	var opts := C3HTTPRequest.Options.new()
 	opts.use_threads = use_threads
 	opts.session = session
@@ -258,7 +265,8 @@ func _time_c3_session(url: String, session: C3HTTPRequest.Session, use_threads: 
 	)
 	var elapsed := Time.get_ticks_usec() - start
 	if not res.ok:
-		push_error("C3HTTPRequest (session) failed: %s" % str(res.error))
+		var who := "C3HTTPRequest (session)" if session else "C3HTTPRequest"
+		push_error("%s failed: %s" % [who, str(res.error)])
 	return elapsed
 
 
@@ -312,6 +320,37 @@ func _run_one_c3(url: String, done: Array, use_threads: bool) -> void:
 	done[0] += 1
 
 
+# Same as _time_c3_concurrent, but all n calls share one Session, so the batch
+# draws warm connections from (and returns them to) the pool instead of opening
+# n fresh ones each rep.
+func _time_c3_session_concurrent(
+	url: String, session: C3HTTPRequest.Session, n: int, use_threads: bool
+) -> int:
+	_show_status("C3 (session)", use_threads)
+	var done := [0]
+	var start := Time.get_ticks_usec()
+	for _i in n:
+		_run_one_c3_session(url, session, done, use_threads)
+	while done[0] < n:
+		await get_tree().process_frame
+	var elapsed := Time.get_ticks_usec() - start
+	return elapsed
+
+
+func _run_one_c3_session(
+	url: String, session: C3HTTPRequest.Session, done: Array, use_threads: bool
+) -> void:
+	var opts := C3HTTPRequest.Options.new()
+	opts.use_threads = use_threads
+	opts.session = session
+	var res := await C3HTTPRequest.request(
+		url, _auth_headers, C3HTTPRequest.Method.GET, "", opts
+	)
+	if not res.ok:
+		push_error("C3HTTPRequest (session) failed: %s" % str(res.error))
+	done[0] += 1
+
+
 # Issues n native requests at once — which requires n nodes, since each
 # HTTPRequest handles only one request at a time.
 func _time_native_concurrent(url: String, n: int, use_threads: bool) -> int:
@@ -347,6 +386,57 @@ func _count_completion(
 	done[0] += 1
 
 
+# --- Small download: shows TCP slow-start savings on a warm session ---
+
+
+func _bench_slow_start() -> void:
+	_server = _host_from_url(DOWNLOAD_URL % 0)
+	output_overlay.print_with_overlay(
+		"\n== Small download: slow-start control vs. straddled IW10 (median of %d runs, %d fps) ==" % [
+			SLOW_START_REPS, SLOW_START_FPS
+		]
+	)
+	Engine.max_fps = SLOW_START_FPS
+	# A single session shared across all sizes so the cwnd is already warm by the
+	# time the 20 KB rows run.
+	var session := C3HTTPRequest.Session.new()
+	for kb: int in SLOW_START_SIZES_KB:
+		var url := DOWNLOAD_URL % (kb * 1024)
+		_phase = "Small download · %d KB" % kb
+		_show_status()
+		for _i in WARMUPS:
+			await _time_c3(url, false)
+			await _time_c3(url, true)
+			await _time_c3(url, false, session)
+			await _time_c3(url, true, session)
+			await _time_native(url, false)
+			await _time_native(url, true)
+		var c3_coop: Array[int] = []
+		var c3_threaded: Array[int] = []
+		var c3_session_coop: Array[int] = []
+		var c3_session_threaded: Array[int] = []
+		var native_coop: Array[int] = []
+		var native_threaded: Array[int] = []
+		for _r in SLOW_START_REPS:
+			c3_coop.append(await _time_c3(url, false))
+			c3_threaded.append(await _time_c3(url, true))
+			c3_session_coop.append(await _time_c3(url, false, session))
+			c3_session_threaded.append(await _time_c3(url, true, session))
+			native_coop.append(await _time_native(url, false))
+			native_threaded.append(await _time_native(url, true))
+		output_overlay.print_with_overlay("\n%-12s         cooperative   threaded" % ("%d KB" % kb))
+		output_overlay.print_with_overlay("C3HTTPRequest:        %7.2f ms   %7.2f ms" % [
+			_median_ms(c3_coop), _median_ms(c3_threaded)
+		])
+		output_overlay.print_with_overlay("C3 (session):         %7.2f ms   %7.2f ms" % [
+			_median_ms(c3_session_coop), _median_ms(c3_session_threaded)
+		])
+		output_overlay.print_with_overlay("native HTTPRequest:   %7.2f ms   %7.2f ms" % [
+			_median_ms(native_coop), _median_ms(native_threaded)
+		])
+	Engine.max_fps = 0
+
+
 # --- File download: stream a large body to disk, swept across body sizes ---
 
 
@@ -357,25 +447,37 @@ func _bench_download() -> void:
 	])
 	output_overlay.print_with_overlay("Target: %s" % (DOWNLOAD_URL % (DOWNLOAD_SIZES_MB[0] * 1024 * 1024)))
 	Engine.max_fps = DOWNLOAD_FPS
+	# A session shared across sizes so its connections are already warm by the
+	# time timing begins. Setup cost is negligible against multi-MB transfers, so
+	# this row is expected to track plain C3 closely — included for completeness.
+	var session := C3HTTPRequest.Session.new()
 	for mb: int in DOWNLOAD_SIZES_MB:
 		var url := DOWNLOAD_URL % (mb * 1024 * 1024)
 		_phase = "Download · %d MB" % mb
 		_show_status()
 		# Warmup primes DNS, TLS, and routing before timing.
 		await _time_c3_download(url, false)
+		await _time_c3_download(url, false, session)
 		await _time_native_download(url, false)
 		var c3_coop: Array[int] = []
 		var c3_threaded: Array[int] = []
+		var c3_session_coop: Array[int] = []
+		var c3_session_threaded: Array[int] = []
 		var native_coop: Array[int] = []
 		var native_threaded: Array[int] = []
 		for _r in DOWNLOAD_REPS:
 			c3_coop.append(await _time_c3_download(url, false))
 			c3_threaded.append(await _time_c3_download(url, true))
+			c3_session_coop.append(await _time_c3_download(url, false, session))
+			c3_session_threaded.append(await _time_c3_download(url, true, session))
 			native_coop.append(await _time_native_download(url, false))
 			native_threaded.append(await _time_native_download(url, true))
 		output_overlay.print_with_overlay("\n%-12s         cooperative   threaded" % ("%d MB" % mb))
 		output_overlay.print_with_overlay("C3HTTPRequest:        %7.2f ms   %7.2f ms" % [
 			_median_ms(c3_coop), _median_ms(c3_threaded)
+		])
+		output_overlay.print_with_overlay("C3 (session):         %7.2f ms   %7.2f ms" % [
+			_median_ms(c3_session_coop), _median_ms(c3_session_threaded)
 		])
 		output_overlay.print_with_overlay("native HTTPRequest:   %7.2f ms   %7.2f ms" % [
 			_median_ms(native_coop), _median_ms(native_threaded)
@@ -384,10 +486,15 @@ func _bench_download() -> void:
 	DirAccess.remove_absolute(DOWNLOAD_PATH)
 
 
-func _time_c3_download(url: String, use_threads: bool) -> int:
-	_show_status("C3HTTPRequest", use_threads)
+# Times a C3HTTPRequest download. Pass a session to reuse pooled connections; a
+# null session opens a fresh connection each call.
+func _time_c3_download(
+	url: String, use_threads: bool, session: C3HTTPRequest.Session = null
+) -> int:
+	_show_status("C3 (session)" if session else "C3HTTPRequest", use_threads)
 	var opts := C3HTTPRequest.Options.new()
 	opts.use_threads = use_threads
+	opts.session = session
 	opts.download_file = DOWNLOAD_PATH
 	opts.download_chunk_size = DOWNLOAD_CHUNK
 	var start := Time.get_ticks_usec()
@@ -396,7 +503,8 @@ func _time_c3_download(url: String, use_threads: bool) -> int:
 	)
 	var elapsed := Time.get_ticks_usec() - start
 	if not res.ok:
-		push_error("C3HTTPRequest download failed: %s" % str(res.error))
+		var who := "C3HTTPRequest (session)" if session else "C3HTTPRequest"
+		push_error("%s download failed: %s" % [who, str(res.error)])
 	return elapsed
 
 
