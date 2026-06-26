@@ -383,7 +383,7 @@ class Session:
 	## Maximum number of idle connections kept per unique
 	## [code](host, port, scheme, TLS, proxy)[/code] key. Extra connections
 	## beyond this limit are closed immediately on checkin.
-	var max_connections_per_host: int = 4
+	var max_connections_per_host: int = 6
 	## Seconds an idle connection may sit in the pool before being discarded on
 	## the next checkout attempt. Keep this shorter than the server's keep-alive
 	## timeout (nginx defaults to 75 s, so 60 s is a safe choice). Set to
