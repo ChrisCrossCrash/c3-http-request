@@ -248,7 +248,7 @@ class TestConnectionCloseHeader extends GutTest:
 
 ## Tests for which methods are safe to replay when a reused pooled connection
 ## dies before any response arrives. Methods are HTTPClient.METHOD_* values, as
-## seen inside _execute() (translated from the addon Method enum via _METHOD_MAP).
+## seen inside request() (translated from the addon Method enum via _METHOD_MAP).
 ##
 ## Only the method gating is unit-tested here: the end-to-end reuse/retry flow is
 ## not exercisable in this suite, which avoids live HTTP by design and cannot mock
