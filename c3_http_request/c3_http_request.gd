@@ -484,6 +484,18 @@ class Mock extends _Impl:
 
 
 class _Impl:
+	class _ParsedURL:
+		var host: String
+		var port: int
+		var path: String
+		var tls: bool
+
+		func _init(h: String, po: int, pa: String, t: bool) -> void:
+			host = h
+			port = po
+			path = pa
+			tls = t
+
 	# Worker-thread poll pacing in microseconds (1 ms), mirroring the cadence of
 	# HTTPRequest's threaded mode. Only used when running on a worker thread.
 	# Note: on Windows, using OS.delay_usec with any value less than 2000
@@ -523,7 +535,7 @@ class _Impl:
 		var streaming := options.on_sse_event.is_valid()
 
 		var parsed := _parse_url(url)
-		if parsed.is_empty():
+		if parsed == null:
 			return _fail(RequestError.client_error('Invalid URL: "%s".' % url))
 
 		var all_headers := _build_request_headers(
@@ -539,15 +551,15 @@ class _Impl:
 			client.set_https_proxy(proxies["https"][0], proxies["https"][1])
 
 		var err: int
-		if parsed["tls"]:
+		if parsed.tls:
 			var tls: TLSOptions = (
 				options.tls_options
 				if options.tls_options != null
 				else TLSOptions.client()
 			)
-			err = client.connect_to_host(parsed["host"], parsed["port"], tls)
+			err = client.connect_to_host(parsed.host, parsed.port, tls)
 		else:
-			err = client.connect_to_host(parsed["host"], parsed["port"])
+			err = client.connect_to_host(parsed.host, parsed.port)
 		if err != OK:
 			return _fail(RequestError.transport(
 				"Failed to start connection (error %d)." % err
@@ -577,11 +589,11 @@ class _Impl:
 
 		if request_data is PackedByteArray:
 			err = client.request_raw(
-				method, parsed["path"], all_headers, request_data
+				method, parsed.path, all_headers, request_data
 			)
 		else:
 			err = client.request(
-				method, parsed["path"], all_headers, request_data
+				method, parsed.path, all_headers, request_data
 			)
 		if err != OK:
 			return _fail(RequestError.transport(
@@ -773,10 +785,10 @@ class _Impl:
 			if not location.is_empty():
 				var redirect_url := _resolve_redirect_url(
 					location,
-					parsed["host"],
-					parsed["port"],
-					parsed["tls"],
-					parsed["path"]
+					parsed.host,
+					parsed.port,
+					parsed.tls,
+					parsed.path
 				)
 				var redirect_headers := _strip_auth_if_cross_origin(
 					custom_headers, parsed, _parse_url(redirect_url)
@@ -903,13 +915,13 @@ class _Impl:
 		else:
 			cb.callv(args)
 
-	func _parse_url(url: String) -> Dictionary:
+	func _parse_url(url: String) -> _ParsedURL:
 		var sep := url.find("://")
 		if sep == -1:
-			return {}
+			return null
 		var scheme := url.substr(0, sep).to_lower()
 		if scheme != "http" and scheme != "https":
-			return {}
+			return null
 		var rest := url.substr(sep + 3)
 		var slash := rest.find("/")
 		var host_part: String
@@ -921,7 +933,7 @@ class _Impl:
 			host_part = rest.substr(0, slash)
 			path = rest.substr(slash)
 		if host_part.is_empty():
-			return {}
+			return null
 		var fragment := path.find("#")
 		if fragment != -1:
 			path = path.substr(0, fragment)
@@ -930,7 +942,7 @@ class _Impl:
 		if host_part.begins_with("["):
 			var bracket_close := host_part.find("]")
 			if bracket_close == -1:
-				return {}
+				return null
 			host = host_part.substr(1, bracket_close - 1)
 			var after_bracket := host_part.substr(bracket_close + 1)
 			if after_bracket.begins_with(":"):
@@ -944,9 +956,7 @@ class _Impl:
 				if port_str.is_valid_int():
 					port = port_str.to_int()
 				host = host_part.substr(0, colon)
-		return {
-			"host": host, "port": port, "path": path, "tls": scheme == "https"
-		}
+		return _ParsedURL.new(host, port, path, scheme == "https")
 
 	# Resolves which proxy applies to each scheme. A key ("http"/"https") is present
 	# only when that scheme has a non-empty host; its value is [host, port]. Kept pure
@@ -1186,15 +1196,15 @@ class _Impl:
 	# Same-origin redirects keep all headers intact so authenticated API chains work.
 	func _strip_auth_if_cross_origin(
 		headers: PackedStringArray,
-		origin: Dictionary,
-		redirect: Dictionary
+		origin: _ParsedURL,
+		redirect: _ParsedURL
 	) -> PackedStringArray:
-		if redirect.is_empty():
+		if redirect == null:
 			return headers
 		if (
-			origin["host"] == redirect["host"]
-			and origin["port"] == redirect["port"]
-			and origin["tls"] == redirect["tls"]
+			origin.host == redirect.host
+			and origin.port == redirect.port
+			and origin.tls == redirect.tls
 		):
 			return headers
 		var sensitive := ["authorization", "cookie", "cookie2", "proxy-authorization"]

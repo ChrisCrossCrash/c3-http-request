@@ -200,76 +200,76 @@ class TestParseUrl extends GutTest:
 
 	func test_https_default_port() -> void:
 		var r := impl._parse_url("https://example.com/path")
-		assert_eq(r["port"], 443)
-		assert_true(r["tls"])
+		assert_eq(r.port, 443)
+		assert_true(r.tls)
 
 	func test_http_default_port() -> void:
 		var r := impl._parse_url("http://example.com/path")
-		assert_eq(r["port"], 80)
-		assert_false(r["tls"])
+		assert_eq(r.port, 80)
+		assert_false(r.tls)
 
 	func test_explicit_port() -> void:
 		var r := impl._parse_url("http://localhost:8080/api")
-		assert_eq(r["host"], "localhost")
-		assert_eq(r["port"], 8080)
+		assert_eq(r.host, "localhost")
+		assert_eq(r.port, 8080)
 
 	func test_host_extracted() -> void:
 		var r := impl._parse_url("https://api.example.com/v1/users")
-		assert_eq(r["host"], "api.example.com")
+		assert_eq(r.host, "api.example.com")
 
 	func test_path_extracted() -> void:
 		var r := impl._parse_url("https://example.com/v1/items")
-		assert_eq(r["path"], "/v1/items")
+		assert_eq(r.path, "/v1/items")
 
 	func test_no_path_defaults_to_slash() -> void:
 		var r := impl._parse_url("https://example.com")
-		assert_eq(r["path"], "/")
+		assert_eq(r.path, "/")
 
 	func test_missing_scheme_returns_empty() -> void:
-		assert_true(impl._parse_url("example.com/path").is_empty())
+		assert_true(impl._parse_url("example.com/path") == null)
 
 	func test_unsupported_scheme_returns_empty() -> void:
-		assert_true(impl._parse_url("ftp://example.com").is_empty())
+		assert_true(impl._parse_url("ftp://example.com") == null)
 
 	func test_empty_host_returns_empty() -> void:
-		assert_true(impl._parse_url("https:///path").is_empty())
+		assert_true(impl._parse_url("https:///path") == null)
 
 	func test_fragment_stripped_from_path() -> void:
 		var r := impl._parse_url("https://example.com/page#section")
-		assert_eq(r["path"], "/page")
+		assert_eq(r.path, "/page")
 
 	func test_fragment_stripped_after_query() -> void:
 		var r := impl._parse_url("https://example.com/page?q=1#section")
-		assert_eq(r["path"], "/page?q=1")
+		assert_eq(r.path, "/page?q=1")
 
 	func test_ipv6_bare_address_default_port() -> void:
 		var r := impl._parse_url("http://[::1]/path")
-		assert_eq(r["host"], "::1")
-		assert_eq(r["port"], 80)
-		assert_false(r["tls"])
+		assert_eq(r.host, "::1")
+		assert_eq(r.port, 80)
+		assert_false(r.tls)
 
 	func test_ipv6_with_explicit_port() -> void:
 		var r := impl._parse_url("http://[::1]:8080/path")
-		assert_eq(r["host"], "::1")
-		assert_eq(r["port"], 8080)
+		assert_eq(r.host, "::1")
+		assert_eq(r.port, 8080)
 
 	func test_ipv6_https_default_port() -> void:
 		var r := impl._parse_url("https://[::1]/path")
-		assert_eq(r["host"], "::1")
-		assert_eq(r["port"], 443)
-		assert_true(r["tls"])
+		assert_eq(r.host, "::1")
+		assert_eq(r.port, 443)
+		assert_true(r.tls)
 
 	func test_ipv6_full_address() -> void:
 		var r := impl._parse_url("https://[2001:db8::1]/path")
-		assert_eq(r["host"], "2001:db8::1")
-		assert_eq(r["port"], 443)
+		assert_eq(r.host, "2001:db8::1")
+		assert_eq(r.port, 443)
 
 	func test_ipv6_no_path_defaults_to_slash() -> void:
 		var r := impl._parse_url("http://[::1]")
-		assert_eq(r["path"], "/")
+		assert_eq(r.path, "/")
 
 	func test_ipv6_unclosed_bracket_returns_empty() -> void:
-		assert_true(impl._parse_url("http://[::1/path").is_empty())
+		assert_true(impl._parse_url("http://[::1/path") == null)
 
 
 ## Tests for the per-scheme proxy routing decision in [method _Impl._resolve_proxies].
