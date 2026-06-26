@@ -628,7 +628,7 @@ class _Impl:
 			path = pa
 			tls = t
 
-	# Worker-thread poll pacing in microseconds (1 ms), mirroring the cadence of
+	# Worker-thread poll pacing in microseconds, mirroring the cadence of
 	# HTTPRequest's threaded mode. Only used when running on a worker thread.
 	# Note: on Windows, using OS.delay_usec with any value less than 2000
 	# is effectively the same as 2000 due to the scheduler's granularity.
