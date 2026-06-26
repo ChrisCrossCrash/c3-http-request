@@ -36,7 +36,7 @@ The addon is a single script: [c3_http_request/c3_http_request.gd](c3_http_reque
 
 **`C3HTTPRequest`** — No `extends`, no `@tool`. Public surface:
 
-- `static func request(url, custom_headers, method, request_data, options)` → `Response` — the one async entry point. Delegates to `_impl._execute()`.
+- `static func request(url, custom_headers, method, request_data, options)` → `Response` — the one async entry point. Delegates to `_impl.request()`.
 - `static var _impl: _Impl` — swapped in tests via `Mock.install()` / `Mock.uninstall()` to intercept calls without touching the network.
 
 **Inner classes:**
@@ -48,11 +48,11 @@ The addon is a single script: [c3_http_request/c3_http_request.gd](c3_http_reque
 - `CancellationToken` — `cancel()`, `is_cancelled()`
 - `_Stub` — builder returned by `Mock.stub()`; configures a canned response via `ok()`, `fail()`, or `returns()`
 - `Mock` — extends `_Impl`; install/uninstall into `_impl`, register stubs with `stub()`, inspect outgoing calls via `calls` / `call_count` / `last_call`, reset with `reset()`
-- `_Impl` — contains `_execute()` with the `HTTPClient` polling loop, plus `_pump()` (the per-poll yield), `_run_threaded()`/`_threads_available()` (background-thread orchestration for `use_threads`), `_emit()` (callback dispatch, main-thread-marshaled when threaded), `_parse_url()`, `_resolve_proxies()` (per-scheme proxy routing), `_timed_out()`, `_cancelled()`, `_emit_status_change()`, `_header_value()`, `_fail()` helpers, the streaming download decompressor (`_decode_chunk()`/`_drain_decoder()`, driving a `StreamPeerGZIP` so gzip `download_file` bodies are decoded on the fly — gzip only; deflate is intentionally unsupported), and the SSE parser (`_drain_sse_buffer()`, `_find_sse_boundary()`, `_emit_sse_event()`)
+- `_Impl` — contains `request()` (the public face of the private class) with the `HTTPClient` polling loop, plus `_pump()` (the per-poll yield), `_run_threaded()`/`_threads_available()` (background-thread orchestration for `use_threads`), `_emit()` (callback dispatch, main-thread-marshaled when threaded), `_parse_url()`, `_resolve_proxies()` (per-scheme proxy routing), `_timed_out()`, `_cancelled()`, `_emit_status_change()`, `_header_value()`, `_fail()` helpers, the streaming download decompressor (`_decode_chunk()`/`_drain_decoder()`, driving a `StreamPeerGZIP` so gzip `download_file` bodies are decoded on the fly — gzip only; deflate is intentionally unsupported), and the SSE parser (`_drain_sse_buffer()`, `_find_sse_boundary()`, `_emit_sse_event()`)
 
-**Transport** is Godot's `HTTPClient` (a `RefCounted`), created per call inside `_Impl._execute()`. The polling loop's single yield point is `_pump()`: in the default cooperative mode it yields to `SceneTree.process_frame` via `Engine.get_main_loop()` (no scene tree membership required from the caller); when `Options.use_threads` is set, `_execute()` runs on a worker `Thread` and `_pump()` becomes a synchronous `OS.delay_usec()` so the coroutine runs straight through off the main thread.
+**Transport** is Godot's `HTTPClient` (a `RefCounted`), created per call inside `_Impl.request()`. The polling loop's single yield point is `_pump()`: in the default cooperative mode it yields to `SceneTree.process_frame` via `Engine.get_main_loop()` (no scene tree membership required from the caller); when `Options.use_threads` is set, `_Impl.request()` runs on a worker `Thread` and `_pump()` becomes a synchronous `OS.delay_usec()` so the coroutine runs straight through off the main thread.
 
-**Tests** are in [tests/](tests/) using the GUT framework (in [addons/gut/](addons/gut/)). Each file covers a focused area: `test_public_api.gd` (public API and types), `test_mock.gd` (Mock lifecycle, stubs, call recording), `test_sse_parsing.gd`, `test_url_and_routing.gd`, `test_compression.gd`, `test_headers.gd`, `test_download_file_cleanup.gd`. `TestableImpl` inside `tests/test_public_api.gd` overrides `_execute()` so no real HTTP calls are made.
+**Tests** are in [tests/](tests/) using the GUT framework (in [addons/gut/](addons/gut/)). Each file covers a focused area: `test_public_api.gd` (public API and types), `test_mock.gd` (Mock lifecycle, stubs, call recording), `test_sse_parsing.gd`, `test_url_and_routing.gd`, `test_compression.gd`, `test_headers.gd`, `test_download_file_cleanup.gd`. `TestableImpl` inside `tests/test_public_api.gd` overrides `request()` so no real HTTP calls are made.
 
 ## GDScript Style Guide
 

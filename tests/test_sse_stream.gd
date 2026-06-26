@@ -3,7 +3,7 @@ extends GutTest
 
 ## Integration tests for SSE streaming behavior that needs a live connection,
 ## using a local TCP server (the parser itself is unit-tested in
-## test_sse_parsing.gd). Covers the failure paths through _execute(), which the
+## test_sse_parsing.gd). Covers the failure paths through request(), which the
 ## pure parser tests can't reach.
 class TestSSEStream extends GutTest:
 	var _server: _IdleSSEServer
@@ -30,7 +30,7 @@ class TestSSEStream extends GutTest:
 			C3HTTPRequest
 			._Impl
 			.new()
-			._execute(
+			.request(
 				"http://127.0.0.1:%d/" % port,
 				PackedStringArray(),
 				HTTPClient.METHOD_GET,

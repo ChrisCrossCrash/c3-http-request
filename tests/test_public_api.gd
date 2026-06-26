@@ -423,7 +423,7 @@ class TestCancellationToken extends GutTest:
 		token.cancel()
 		var opts := C3HTTPRequest.Options.new()
 		opts.cancellation_token = token
-		var res: C3HTTPRequest.Response = await C3HTTPRequest._Impl.new()._execute(
+		var res: C3HTTPRequest.Response = await C3HTTPRequest._Impl.new().request(
 			"https://example.com",
 			PackedStringArray(),
 			HTTPClient.METHOD_GET,
@@ -438,7 +438,7 @@ class TestCancellationToken extends GutTest:
 		token.cancel()
 		var opts := C3HTTPRequest.Options.new()
 		opts.cancellation_token = token
-		var res: C3HTTPRequest.Response = await C3HTTPRequest._Impl.new()._execute(
+		var res: C3HTTPRequest.Response = await C3HTTPRequest._Impl.new().request(
 			"https://example.com",
 			PackedStringArray(),
 			HTTPClient.METHOD_GET,

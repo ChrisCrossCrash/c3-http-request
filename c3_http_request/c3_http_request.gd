@@ -47,7 +47,7 @@ static func request(
 	options: Options = null
 ) -> Response:
 	var opts: Options = options if options != null else Options.new()
-	return await _impl._execute(
+	return await _impl.request(
 		url, custom_headers, _METHOD_MAP[method], request_data, opts
 	)
 
@@ -67,7 +67,7 @@ static func request_raw(
 	options: Options = null
 ) -> Response:
 	var opts: Options = options if options != null else Options.new()
-	return await _impl._execute(
+	return await _impl.request(
 		url, custom_headers, _METHOD_MAP[method], request_data_raw, opts
 	)
 
@@ -454,7 +454,7 @@ class Mock extends _Impl:
 		calls.clear()
 		_stubs.clear()
 
-	func _execute(
+	func request(
 		url: String,
 		custom_headers: PackedStringArray,
 		method: int,
@@ -502,7 +502,7 @@ class _Impl:
 	# is effectively the same as 2000 due to the scheduler's granularity.
 	const _PUMP_DELAY_USEC := 1000
 
-	func _execute(
+	func request(
 		url: String,
 		custom_headers: PackedStringArray,
 		method: int,
@@ -793,7 +793,7 @@ class _Impl:
 				var redirect_headers := _strip_auth_if_cross_origin(
 					custom_headers, parsed, _parse_url(redirect_url)
 				)
-				var redirect_res: Response = await _execute(
+				var redirect_res: Response = await request(
 					redirect_url,
 					redirect_headers,
 					_redirect_method(method, status),
@@ -835,7 +835,7 @@ class _Impl:
 		return res
 
 	# Yields between polls. On a worker thread it sleeps briefly and returns
-	# synchronously — the await never suspends, so _execute() runs straight through
+	# synchronously — the await never suspends, so request() runs straight through
 	# on the worker. On the main thread it yields to the next frame, keeping it
 	# responsive.
 	func _pump(tree: SceneTree, on_worker: bool) -> void:
@@ -844,9 +844,9 @@ class _Impl:
 		else:
 			await tree.process_frame
 
-	# Runs _execute() on a dedicated background thread (polling at OS speed) and
+	# Runs request() on a dedicated background thread (polling at OS speed) and
 	# awaits its completion on the main thread, leaving the public await API
-	# unchanged. The worker re-enters _execute() with _on_worker = true.
+	# unchanged. The worker re-enters request() with _on_worker = true.
 	func _run_threaded(
 		url: String,
 		custom_headers: PackedStringArray,
@@ -868,7 +868,7 @@ class _Impl:
 		var thread := Thread.new()
 		thread.start(
 			func() -> Response:
-				return await _execute(
+				return await request(
 					url,
 					custom_headers,
 					method,
@@ -882,14 +882,14 @@ class _Impl:
 			await tree.process_frame
 		var result: Variant = thread.wait_to_finish()
 		# Enforce the worker-never-suspends invariant: on the worker path _pump
-		# sleeps synchronously and never yields, so execute() must run straight
+		# sleeps synchronously and never yields, so request() must run straight
 		# through and the thread function must return a Response. If a future change
 		# adds an await that actually suspends, the function returns a coroutine
 		# state instead — fail loudly here rather than corrupting the result.
 		assert(
 			result is Response,
 			"C3HTTPRequest: threaded worker suspended; the worker path must run "
-			+ "synchronously (see _pump). Did a new await get added to _execute()?"
+			+ "synchronously (see _pump). Did a new await get added to request()?"
 		)
 		var res: Response = result
 		if has_observers:

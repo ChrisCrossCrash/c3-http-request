@@ -10,7 +10,7 @@ class TestSSEParsing extends GutTest:
 
 	var impl: C3HTTPRequest._Impl
 	var events: Array = []
-	# Persistent last-event-id / retry buffers, mirroring the boxes _execute()
+	# Persistent last-event-id / retry buffers, mirroring the boxes request()
 	# threads through the parser across the whole stream.
 	var id_box: Array = [""]
 	var retry_box: Array = [-1]

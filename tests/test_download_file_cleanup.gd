@@ -94,7 +94,7 @@ class TestDownloadFileCleanup extends GutTest:
 			C3HTTPRequest
 			. _Impl
 			. new()
-			._execute(url, PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
+			.request(url, PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
 		)
 		assert_false(res.ok)
 		assert_eq(res.error.kind, C3HTTPRequest.RequestError.Kind.TIMEOUT)
@@ -118,7 +118,7 @@ class TestDownloadFileCleanup extends GutTest:
 			C3HTTPRequest
 			. _Impl
 			. new()
-			._execute(url, PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
+			.request(url, PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
 		)
 		assert_false(res.ok)
 		assert_eq(res.error.kind, C3HTTPRequest.RequestError.Kind.CANCELLED)
@@ -141,7 +141,7 @@ class TestDownloadFileCleanup extends GutTest:
 		opts.download_file = _DOWNLOAD_PATH
 		opts.cancellation_token = token
 		opts.timeout = 5.0  # safety net; the cancel fires on the first poll yield
-		var res: C3HTTPRequest.Response = await impl._execute(
+		var res: C3HTTPRequest.Response = await impl.request(
 			"http://192.0.2.1/",
 			PackedStringArray(),
 			HTTPClient.METHOD_GET,
