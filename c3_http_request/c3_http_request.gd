@@ -761,7 +761,7 @@ class _Impl:
 		# (non-2xx error bodies, redirect bodies) is collected normally.
 		var sse_mode := streaming and status >= 200 and status < 300
 		# On a worker thread, marshal SSE events back to the main thread so the
-		# caller's sink never runs off-thread; otherwise dispatch directly.
+		# caller's sink never runs off-thread; otherwise it would dispatch directly.
 		var sse_sink := options.on_sse_event
 		if _on_worker and sse_sink.is_valid():
 			sse_sink = func(data: String, event_type: String, last_event_id: String) -> void:
@@ -779,10 +779,6 @@ class _Impl:
 		var bytes_received := 0
 		# Bytes actually written to the download file (decompressed, when decoding).
 		var bytes_written := 0
-		# Open the download target only now, at the body phase — never earlier. A
-		# request that fails while connecting or sending leaves the path untouched
-		# rather than truncating it to an empty file it will never fill, and there is
-		# nothing to clean up on those early-return paths.
 		var file: FileAccess = null
 		if not options.download_file.is_empty() and not streaming:
 			file = FileAccess.open(options.download_file, FileAccess.WRITE)
