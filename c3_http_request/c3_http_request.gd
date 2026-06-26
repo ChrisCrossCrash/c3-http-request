@@ -764,9 +764,11 @@ class _Impl:
 		# A server may end the final event without a trailing blank line; flush
 		# what remains. Every byte has arrived, so decode the tail in one pass.
 		if sse_mode:
-			var tail := sse_buffer.get_string_from_utf8()
+			var tail := _decode_sse_lines(sse_buffer)
 			if not tail.strip_edges().is_empty():
-				_emit_sse_event(tail, sse_sink, sse_id, sse_retry)
+				_emit_sse_event(
+					tail, sse_sink, sse_id, sse_retry, _id_field_has_nul(sse_buffer)
+				)
 
 		if file == null:
 			var decoded: Variant = _maybe_decompress_body(
@@ -1223,9 +1225,12 @@ class _Impl:
 	) -> PackedByteArray:
 		var bound := _find_sse_boundary(buffer)
 		while bound.x != -1:
+			var event_bytes := buffer.slice(0, bound.x)
+			# Decide the id-NUL case on the raw bytes (see _id_field_has_nul) before
+			# decoding, since get_string_from_utf8() truncates the value at the NUL.
 			_emit_sse_event(
-				buffer.slice(0, bound.x).get_string_from_utf8(),
-				on_event, id_box, retry_box
+				_decode_sse_lines(event_bytes),
+				on_event, id_box, retry_box, _id_field_has_nul(event_bytes)
 			)
 			buffer = buffer.slice(bound.y)
 			bound = _find_sse_boundary(buffer)
@@ -1260,7 +1265,11 @@ class _Impl:
 	# server's suggested backoff in ms (surfaced on the final Response). This
 	# client does not reconnect itself; it only exposes the cursors.
 	func _emit_sse_event(
-		raw_event: String, on_event: Callable, id_box: Array, retry_box: Array
+		raw_event: String,
+		on_event: Callable,
+		id_box: Array,
+		retry_box: Array,
+		id_has_nul: bool = false
 	) -> void:
 		var data_lines := PackedStringArray()
 		var event_type := "message"
@@ -1282,8 +1291,11 @@ class _Impl:
 				var value := line.substr(3)
 				if value.begins_with(" "):
 					value = value.substr(1)
-				# Per spec, an id value containing a NUL char is ignored entirely.
-				if not value.contains(char(0)):
+				# Per spec, an id whose value contains a NUL is ignored entirely; the
+				# previous cursor stands. The NUL is detected upstream on the raw bytes
+				# (see _id_field_has_nul) because the decoded value can no longer reveal
+				# it — get_string_from_utf8() truncates at the NUL.
+				if not id_has_nul:
 					id_box[0] = value
 			elif line.begins_with("retry:"):
 				var value := line.substr(6)
@@ -1298,6 +1310,49 @@ class _Impl:
 		if data_lines.is_empty():
 			return
 		on_event.call("\n".join(data_lines), event_type, id_box[0])
+
+	# Decodes a raw event block to a String one line at a time, splitting on LF
+	# (0x0A) at the byte level. Decoding per line rather than in one pass confines
+	# get_string_from_utf8()'s truncate-at-NUL behavior to the offending line, so a
+	# NUL in (say) an id: field can't swallow the data: lines that follow it. The CR
+	# of a CRLF terminator rides along as a trailing character and is stripped later
+	# by _emit_sse_event, exactly as before.
+	func _decode_sse_lines(event_bytes: PackedByteArray) -> String:
+		var lines := PackedStringArray()
+		var start := 0
+		while start <= event_bytes.size():
+			var nl := event_bytes.find(0x0A, start)
+			var stop := nl if nl != -1 else event_bytes.size()
+			lines.append(event_bytes.slice(start, stop).get_string_from_utf8())
+			if nl == -1:
+				break
+			start = nl + 1
+		return "\n".join(lines)
+
+	# True when [param event_bytes] contains an "id:" field whose value holds a NUL
+	# (0x00). The check runs on the raw bytes, before UTF-8 decoding, for two
+	# reasons: get_string_from_utf8() truncates a value at its first NUL (hiding the
+	# rest of the field), and a Godot String cannot carry a NUL at all (it decodes
+	# to U+FFFD). Working at the byte level keeps the spec's "ignore a NUL id"
+	# guarantee — which stops a NUL being echoed back as a Last-Event-ID header —
+	# independent of how the engine decodes strings. The "\n" split and the "id:"
+	# prefix (0x69 0x64 0x3A) are pure ASCII, so they are safe to match byte-wise.
+	func _id_field_has_nul(event_bytes: PackedByteArray) -> bool:
+		var start := 0
+		while start <= event_bytes.size():
+			var nl := event_bytes.find(0x0A, start)
+			var end := nl if nl != -1 else event_bytes.size()
+			var line := event_bytes.slice(start, end)
+			if (
+				line.size() >= 3
+				and line[0] == 0x69 and line[1] == 0x64 and line[2] == 0x3A
+				and line.find(0x00) != -1
+			):
+				return true
+			if nl == -1:
+				break
+			start = nl + 1
+		return false
 
 	func _fail(error: RequestError, sse_retry_ms: int = -1) -> Response:
 		var res := Response.new()

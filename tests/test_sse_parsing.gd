@@ -118,13 +118,21 @@ class TestSSEParsing extends GutTest:
 		impl._emit_sse_event("id:  spaced\ndata: hi", _sink(), id_box, retry_box)
 		assert_eq(id_box[0], " spaced")
 
-	func test_emit_id_with_nul_is_ignored() -> void:
-		# Per spec, an id value containing a NUL char is ignored entirely — the
-		# previous cursor stands.
-		impl._emit_sse_event("id: x\ndata: a", _sink(), id_box, retry_box)
-		impl._emit_sse_event("id: bad%sid\ndata: b" % char(0), _sink(), id_box, retry_box)
-		assert_eq(id_box[0], "x")
-		assert_eq(events[1][2], "x")
+	func test_id_with_nul_is_ignored() -> void:
+		# Per spec, an id whose value contains a NUL is ignored entirely — the previous
+		# cursor stands. The NUL is detected on the raw bytes (the parser can't see it
+		# once decoded: get_string_from_utf8 truncates the value there), so this is fed
+		# through _drain_sse_buffer as bytes. The 0x00 is appended to the buffer rather
+		# than written as char(0): a char(0) literal would be constant-folded into a NUL
+		# embedded in the compiled script, tripping the engine's resource loader.
+		var stream := "id: x\ndata: a\n\nid: bad".to_utf8_buffer()
+		stream.append(0x00)
+		stream.append_array("id\ndata: b\n\n".to_utf8_buffer())
+		impl._drain_sse_buffer(stream, _sink(), id_box, retry_box)
+		assert_eq(id_box[0], "x", "NUL id ignored; previous cursor kept")
+		# The NUL only drops the id field — the event's data still dispatches, under
+		# the prior id, rather than being swallowed by the truncated decode.
+		assert_eq(events[1], ["b", "message", "x"])
 
 	# retry:
 	func test_emit_retry_sets_value() -> void:
