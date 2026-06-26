@@ -684,7 +684,7 @@ class _Impl:
 		var client: HTTPClient
 		if options.session != null:
 			pool_key = options.session._make_key(
-				parsed["host"], parsed["port"], parsed["tls"], options.tls_options, options
+				parsed.host, parsed.port, parsed.tls, options.tls_options, options
 			)
 			# A retry after a silent reuse failure forces a fresh connection: skip
 			# checkout (so we never hand back another pooled socket) but keep pool_key
@@ -999,13 +999,13 @@ class _Impl:
 	func _send_request(
 		client: HTTPClient,
 		method: int,
-		parsed: Dictionary,
+		parsed: _ParsedURL,
 		all_headers: PackedStringArray,
 		request_data: Variant
 	) -> int:
 		if request_data is PackedByteArray:
-			return client.request_raw(method, parsed["path"], all_headers, request_data)
-		return client.request(method, parsed["path"], all_headers, request_data)
+			return client.request_raw(method, parsed.path, all_headers, request_data)
+		return client.request(method, parsed.path, all_headers, request_data)
 
 	# Connects [param client] to the host described by [param parsed], applying
 	# proxies and TLS from [param options], then polls until STATUS_CONNECTED or
@@ -1013,7 +1013,7 @@ class _Impl:
 	# Response on failure.
 	func _connect_client(
 		client: HTTPClient,
-		parsed: Dictionary,
+		parsed: _ParsedURL,
 		options: Options,
 		start_ms: int,
 		tree: SceneTree,
@@ -1025,15 +1025,15 @@ class _Impl:
 		if proxies.has("https"):
 			client.set_https_proxy(proxies["https"][0], proxies["https"][1])
 		var err: int
-		if parsed["tls"]:
+		if parsed.tls:
 			var tls: TLSOptions = (
 				options.tls_options
 				if options.tls_options != null
 				else TLSOptions.client()
 			)
-			err = client.connect_to_host(parsed["host"], parsed["port"], tls)
+			err = client.connect_to_host(parsed.host, parsed.port, tls)
 		else:
-			err = client.connect_to_host(parsed["host"], parsed["port"])
+			err = client.connect_to_host(parsed.host, parsed.port)
 		if err != OK:
 			return _fail(RequestError.transport(
 				"Failed to start connection (error %d)." % err
