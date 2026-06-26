@@ -716,7 +716,7 @@ class _Impl:
 			# it on a fresh connection regardless of method. _force_fresh makes the
 			# child skip the pool, so it cannot loop; start_ms preserves the deadline.
 			if reusing:
-				return await _execute(
+				return await request(
 					url, custom_headers, method, request_data, options,
 					redirects_left, _on_worker, start_ms, true
 				)
@@ -748,7 +748,7 @@ class _Impl:
 			# _force_fresh makes the child skip the pool, so it cannot loop. start_ms
 			# carries through to preserve the original deadline.
 			if reusing and _is_safe_to_retry(method):
-				return await _execute(
+				return await request(
 					url, custom_headers, method, request_data, options,
 					redirects_left, _on_worker, start_ms, true
 				)
