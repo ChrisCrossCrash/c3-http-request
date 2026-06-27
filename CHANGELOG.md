@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - **Breaking:** the `Options.on_sse_event` callback now receives a third argument, `last_event_id: String`, so its signature is `on_sse_event.call(data, event_type, last_event_id)`. Existing two-argument sinks must add the parameter. `last_event_id` is the stream's `id:` cursor and persists across events per the SSE spec — an event with no `id:` line still reports the most recent one. Together with `Response.sse_retry_ms`, this gives a caller everything needed to reconnect a dropped stream (echo the id as a `Last-Event-ID` header after waiting the suggested backoff); the client still does not auto-reconnect itself.
+- **Breaking:** the addon-specific `C3HTTPRequest.Method` enum has been removed in favor of Godot's native `HTTPClient.Method`, mirroring the native `HTTPRequest` node and dropping an internal translation layer. Migrate by replacing `C3HTTPRequest.Method.GET` with `HTTPClient.METHOD_GET`, `C3HTTPRequest.Method.POST` with `HTTPClient.METHOD_POST`, and so on for the remaining methods.
 
 ## [0.3.1] - 2026-06-22
 

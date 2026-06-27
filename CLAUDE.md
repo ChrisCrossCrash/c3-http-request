@@ -39,9 +39,10 @@ The addon is a single script: [c3_http_request/c3_http_request.gd](c3_http_reque
 - `static func request(url, custom_headers, method, request_data, options)` → `Response` — the one async entry point. Delegates to `_impl.request()`.
 - `static var _impl: _Impl` — swapped in tests via `Mock.install()` / `Mock.uninstall()` to intercept calls without touching the network.
 
+HTTP methods use Godot's native `HTTPClient.Method` enum (e.g. `HTTPClient.METHOD_GET`) directly, mirroring the native `HTTPRequest` node — there is no addon-specific method enum.
+
 **Inner classes:**
 
-- `Method` enum — `GET`, `HEAD`, `POST`, `PUT`, `DELETE`, `OPTIONS`, `PATCH`
 - `Options` — `timeout`, `body_size_limit`, `download_chunk_size`, `accept_gzip`, `max_redirects`, `use_threads` (run the loop on a background thread, marshaling callbacks back to the main thread), `download_file`, `tls_options`, `http_proxy_host`, `http_proxy_port`, `https_proxy_host`, `https_proxy_port`, `cancellation_token`, `on_sse_event` (SSE streaming sink), `on_progress` (download progress sink), `on_status_changed` (HTTPClient status sink)
 - `Response` — `ok: bool`, `error: RequestError`, `status: int`, `headers: PackedStringArray`, `body: String`, `sse_retry_ms: int` (server's SSE `retry:` backoff, `-1` if none)
 - `RequestError` — `Kind` enum (`TRANSPORT`, `HTTP`, `CLIENT`, `CANCELLED`, `TIMEOUT`, `BODY_SIZE_LIMIT_EXCEEDED`), `kind`, `message`, `status`, factory methods, `_to_string()`

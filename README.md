@@ -103,7 +103,7 @@ var res2 := await C3HTTPRequest.request(
         "Content-Type: application/json",
         "Authorization: Bearer " + token,
     ]),
-    C3HTTPRequest.Method.POST,
+    HTTPClient.METHOD_POST,
     '{"title": "hello"}'
 )
 
@@ -111,14 +111,14 @@ var res2 := await C3HTTPRequest.request(
 var res_raw := await C3HTTPRequest.request_raw(
     "https://api.example.com/upload",
     PackedStringArray(["Content-Type: application/octet-stream"]),
-    C3HTTPRequest.Method.POST,
+    HTTPClient.METHOD_POST,
     payload  # a PackedByteArray
 )
 
 # Per-request options
 var opts := C3HTTPRequest.Options.new()
 opts.timeout = 10.0
-var res3 := await C3HTTPRequest.request(url, PackedStringArray(), C3HTTPRequest.Method.GET, "", opts)
+var res3 := await C3HTTPRequest.request(url, PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
 ```
 
 ## Response
@@ -182,7 +182,7 @@ opts.cancellation_token = token
 # In another coroutine or signal handler:
 token.cancel()
 
-var res := await C3HTTPRequest.request(url, PackedStringArray(), C3HTTPRequest.Method.GET, "", opts)
+var res := await C3HTTPRequest.request(url, PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
 if not res.ok and res.error.kind == C3HTTPRequest.RequestError.Kind.CANCELLED:
     print("Cancelled.")
 ```
@@ -196,7 +196,7 @@ var opts := C3HTTPRequest.Options.new()
 opts.on_sse_event = func(data: String, event_type: String, last_event_id: String) -> void:
     print("[%s] %s" % [event_type, data])
 
-var res := await C3HTTPRequest.request("https://api.example.com/stream", PackedStringArray(), C3HTTPRequest.Method.GET, "", opts)
+var res := await C3HTTPRequest.request("https://api.example.com/stream", PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
 if not res.ok:
     push_error(str(res.error))  # non-2xx body is collected normally into res.error
 ```
@@ -229,7 +229,7 @@ while true:
         last_id[0] = id  # remember where to resume from
         handle_event(data, event_type)
 
-    var res := await C3HTTPRequest.request("https://api.example.com/stream", headers, C3HTTPRequest.Method.GET, "", opts)
+    var res := await C3HTTPRequest.request("https://api.example.com/stream", headers, HTTPClient.METHOD_GET, "", opts)
 
     # Honor the server's backoff hint if it sent one, else fall back.
     var backoff_ms := res.sse_retry_ms if res.sse_retry_ms >= 0 else 3000
@@ -248,7 +248,7 @@ opts.on_progress = func(bytes_received: int, total_bytes: int) -> void:
     else:
         print("%d bytes" % bytes_received)  # length unknown
 
-var res := await C3HTTPRequest.request("https://example.com/large.bin", PackedStringArray(), C3HTTPRequest.Method.GET, "", opts)
+var res := await C3HTTPRequest.request("https://example.com/large.bin", PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
 ```
 
 Works for both in-memory and `download_file` downloads. `bytes_received` counts raw bytes off the wire, so it may differ from the final `res.body.size()` when a gzip body is decompressed after the transfer completes. It has no effect in SSE mode (`on_sse_event`), where the events themselves are the incremental signal.
@@ -262,7 +262,7 @@ var opts := C3HTTPRequest.Options.new()
 opts.on_status_changed = func(status: HTTPClient.Status) -> void:
     print(status)  # HTTPClient.STATUS_CONNECTING, STATUS_REQUESTING, STATUS_BODY, ...
 
-var res := await C3HTTPRequest.request("https://example.com", PackedStringArray(), C3HTTPRequest.Method.GET, "", opts)
+var res := await C3HTTPRequest.request("https://example.com", PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
 ```
 
 A typical request reports `STATUS_RESOLVING`/`STATUS_CONNECTING` → `STATUS_CONNECTED` → `STATUS_REQUESTING` → `STATUS_BODY`. Notes:
@@ -280,7 +280,7 @@ By default the polling loop yields to the scene tree whenever it has to wait, so
 var opts := C3HTTPRequest.Options.new()
 opts.use_threads = true
 
-var res := await C3HTTPRequest.request("https://example.com/large-file", PackedStringArray(), C3HTTPRequest.Method.GET, "", opts)
+var res := await C3HTTPRequest.request("https://example.com/large-file", PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
 ```
 
 Notes:

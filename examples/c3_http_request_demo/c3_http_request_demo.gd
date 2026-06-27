@@ -49,7 +49,7 @@ func demo_post() -> void:
 	var res := await C3HTTPRequest.request(
 		"https://jsonplaceholder.typicode.com/posts",
 		PackedStringArray(["Content-Type: application/json"]),
-		C3HTTPRequest.Method.POST,
+		HTTPClient.METHOD_POST,
 		'{"title": "hello", "body": "world", "userId": 1}'
 	)
 	if not res.ok:
@@ -79,7 +79,7 @@ func demo_timeout() -> void:
 	var res := await C3HTTPRequest.request(
 		"https://jsonplaceholder.typicode.com/todos/1",
 		PackedStringArray(),
-		C3HTTPRequest.Method.GET,
+		HTTPClient.METHOD_GET,
 		"",
 		opts
 	)
@@ -94,7 +94,7 @@ func demo_body_size_limit() -> void:
 	var res := await C3HTTPRequest.request(
 		"https://jsonplaceholder.typicode.com/posts",
 		PackedStringArray(),
-		C3HTTPRequest.Method.GET,
+		HTTPClient.METHOD_GET,
 		"",
 		opts
 	)
@@ -112,7 +112,7 @@ func demo_redirect_limit() -> void:
 	var res := await C3HTTPRequest.request(
 		"https://httpbin.org/redirect/5",
 		PackedStringArray(),
-		C3HTTPRequest.Method.GET,
+		HTTPClient.METHOD_GET,
 		"",
 		opts
 	)
@@ -129,7 +129,7 @@ func demo_download_file() -> void:
 	var res := await C3HTTPRequest.request(
 		"https://jsonplaceholder.typicode.com/todos/1",
 		PackedStringArray(),
-		C3HTTPRequest.Method.GET,
+		HTTPClient.METHOD_GET,
 		"",
 		opts
 	)
@@ -163,7 +163,7 @@ func demo_progress() -> void:
 	var res := await C3HTTPRequest.request(
 		"https://httpbin.org/bytes/102400",
 		PackedStringArray(),
-		C3HTTPRequest.Method.GET,
+		HTTPClient.METHOD_GET,
 		"",
 		opts
 	)
@@ -185,7 +185,7 @@ func demo_status() -> void:
 	var res := await C3HTTPRequest.request(
 		"https://jsonplaceholder.typicode.com/todos/1",
 		PackedStringArray(),
-		C3HTTPRequest.Method.GET,
+		HTTPClient.METHOD_GET,
 		"",
 		opts
 	)
@@ -205,7 +205,7 @@ func demo_cancellation() -> void:
 	var res := await C3HTTPRequest.request(
 		"https://jsonplaceholder.typicode.com/todos/1",
 		PackedStringArray(),
-		C3HTTPRequest.Method.GET,
+		HTTPClient.METHOD_GET,
 		"",
 		opts
 	)
@@ -262,7 +262,7 @@ func demo_sse() -> void:
 		res = await C3HTTPRequest.request(
 			"https://stream.wikimedia.org/v2/stream/recentchange",
 			headers,
-			C3HTTPRequest.Method.GET,
+			HTTPClient.METHOD_GET,
 			"",
 			opts
 		)
