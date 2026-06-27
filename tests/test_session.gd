@@ -34,6 +34,12 @@ class TestSessionPool extends GutTest:
 		session.checkin("key", HTTPClient.new())
 		assert_eq(session._pool["key"].size(), 2)
 
+	func test_checkin_with_zero_max_connections_does_not_pool() -> void:
+		session.max_connections_per_host = 0
+		var client := HTTPClient.new()
+		session.checkin("key", client)
+		assert_false(session._pool.has("key"))
+
 	func test_max_connections_evicts_oldest_on_overflow() -> void:
 		session.max_connections_per_host = 2
 		var c1 := HTTPClient.new()
