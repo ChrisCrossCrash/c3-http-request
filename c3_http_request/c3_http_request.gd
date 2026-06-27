@@ -6,21 +6,8 @@ class_name C3HTTPRequest
 ## [member Response.ok] as a single failure check that covers transport
 ## errors, timeouts, and non-2xx statuses alike.
 
-## HTTP method for [method request].
-enum Method { GET = 0, HEAD, POST, PUT, DELETE, OPTIONS, PATCH }
-
 ## The installed version of this addon, e.g. for logging or feature gating.
 const VERSION := "v0.3.1"
-
-const _METHOD_MAP: Dictionary = {
-	Method.GET: HTTPClient.METHOD_GET,
-	Method.HEAD: HTTPClient.METHOD_HEAD,
-	Method.POST: HTTPClient.METHOD_POST,
-	Method.PUT: HTTPClient.METHOD_PUT,
-	Method.DELETE: HTTPClient.METHOD_DELETE,
-	Method.OPTIONS: HTTPClient.METHOD_OPTIONS,
-	Method.PATCH: HTTPClient.METHOD_PATCH,
-}
 
 static var _impl: _Impl = _Impl.new()
 
@@ -35,20 +22,21 @@ func _init() -> void:
 ## Sends an HTTP request to [param url] and returns the response. [br]
 ## [param custom_headers] are sent alongside any headers injected by
 ## [member Options.accept_gzip]. [br]
-## [param method] is a [enum Method] value; defaults to [code]GET[/code]. [br]
+## [param method] is an [enum HTTPClient.Method] value; defaults to
+## [code]METHOD_GET[/code]. [br]
 ## [param request_data] is the raw request body string. [br]
 ## [param options] controls timeout, redirects, and other per-request
 ## settings; [code]null[/code] uses all defaults.
 static func request(
 	url: String,
 	custom_headers: PackedStringArray = PackedStringArray(),
-	method: Method = Method.GET,
+	method: HTTPClient.Method = HTTPClient.METHOD_GET,
 	request_data: String = "",
 	options: Options = null
 ) -> Response:
 	var opts: Options = options if options != null else Options.new()
 	return await _impl.request(
-		url, custom_headers, _METHOD_MAP[method], request_data, opts
+		url, custom_headers, method, request_data, opts
 	)
 
 
@@ -56,19 +44,19 @@ static func request(
 ## the body is sent as-is without UTF-8 encoding. Use for binary payloads
 ## (encoded files, serialized data, custom binary protocols). [br]
 ## [param request_data_raw] is the raw request body bytes. [br]
-## [param method] defaults to [code]POST[/code]; a raw body is ignored on
-## [code]GET[/code]. [br]
+## [param method] defaults to [code]METHOD_POST[/code]; a raw body is ignored
+## on [code]METHOD_GET[/code]. [br]
 ## See [method request] for the remaining parameters.
 static func request_raw(
 	url: String,
 	custom_headers: PackedStringArray = PackedStringArray(),
-	method: Method = Method.POST,
+	method: HTTPClient.Method = HTTPClient.METHOD_POST,
 	request_data_raw: PackedByteArray = PackedByteArray(),
 	options: Options = null
 ) -> Response:
 	var opts: Options = options if options != null else Options.new()
 	return await _impl.request(
-		url, custom_headers, _METHOD_MAP[method], request_data_raw, opts
+		url, custom_headers, method, request_data_raw, opts
 	)
 
 
@@ -137,7 +125,7 @@ class Options:
 	##     status_changes.append(status)
 	##
 	## await C3HTTPRequest.request("https://example.com",
-	##     PackedStringArray(), C3HTTPRequest.Method.GET, "", opts)
+	##     PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
 	##
 	## # Every status change has already fired — none is still queued for a later
 	## # frame — so this prints the same count with use_threads true or false.
@@ -1240,7 +1228,7 @@ class _Impl:
 	# before any response. Restricted to the bodyless-idempotent methods (matching
 	# Go's net/http): once the request was sent, a body-bearing method may already
 	# have been processed by the server, so it must not be auto-retried. The method
-	# here is an HTTPClient.METHOD_* value (translated via _METHOD_MAP).
+	# here is an HTTPClient.METHOD_* value.
 	func _is_safe_to_retry(method: int) -> bool:
 		return method in [
 			HTTPClient.METHOD_GET,

@@ -28,7 +28,7 @@ class TestRequest extends GutTest:
 		await C3HTTPRequest.request(
 			"https://example.com",
 			PackedStringArray(),
-			C3HTTPRequest.Method.POST
+			HTTPClient.METHOD_POST
 		)
 		assert_eq(mock.calls[0]["method"], HTTPClient.METHOD_POST)
 
@@ -45,7 +45,7 @@ class TestRequest extends GutTest:
 		await C3HTTPRequest.request(
 			"https://example.com",
 			PackedStringArray(),
-			C3HTTPRequest.Method.POST,
+			HTTPClient.METHOD_POST,
 			"hello"
 		)
 		assert_eq(mock.calls[0]["body"], "hello")
@@ -55,7 +55,7 @@ class TestRequest extends GutTest:
 		await C3HTTPRequest.request_raw(
 			"https://example.com",
 			PackedStringArray(),
-			C3HTTPRequest.Method.POST,
+			HTTPClient.METHOD_POST,
 			body
 		)
 		assert_eq(mock.calls[0]["body"], body)
@@ -68,7 +68,7 @@ class TestRequest extends GutTest:
 		await C3HTTPRequest.request_raw(
 			"https://example.com",
 			PackedStringArray(),
-			C3HTTPRequest.Method.PUT,
+			HTTPClient.METHOD_PUT,
 			PackedByteArray([1, 2, 3])
 		)
 		assert_eq(mock.calls[0]["method"], HTTPClient.METHOD_PUT)
@@ -88,7 +88,7 @@ class TestRequest extends GutTest:
 		await C3HTTPRequest.request_raw(
 			"https://example.com",
 			PackedStringArray(),
-			C3HTTPRequest.Method.POST,
+			HTTPClient.METHOD_POST,
 			PackedByteArray(),
 			opts
 		)
@@ -110,7 +110,7 @@ class TestRequest extends GutTest:
 		await C3HTTPRequest.request(
 			"https://example.com",
 			PackedStringArray(),
-			C3HTTPRequest.Method.GET,
+			HTTPClient.METHOD_GET,
 			"",
 			opts
 		)
@@ -122,7 +122,7 @@ class TestRequest extends GutTest:
 		await C3HTTPRequest.request(
 			"https://example.com",
 			PackedStringArray(),
-			C3HTTPRequest.Method.GET,
+			HTTPClient.METHOD_GET,
 			"",
 			opts
 		)
@@ -136,7 +136,7 @@ class TestRequest extends GutTest:
 		await C3HTTPRequest.request(
 			"https://example.com",
 			PackedStringArray(),
-			C3HTTPRequest.Method.GET,
+			HTTPClient.METHOD_GET,
 			"",
 			opts
 		)
@@ -150,7 +150,7 @@ class TestRequest extends GutTest:
 		await C3HTTPRequest.request(
 			"https://example.com",
 			PackedStringArray(),
-			C3HTTPRequest.Method.GET,
+			HTTPClient.METHOD_GET,
 			"",
 			opts
 		)
@@ -166,7 +166,7 @@ class TestRequest extends GutTest:
 		await C3HTTPRequest.request(
 			"https://example.com",
 			PackedStringArray(),
-			C3HTTPRequest.Method.GET,
+			HTTPClient.METHOD_GET,
 			"",
 			opts
 		)

@@ -261,7 +261,7 @@ func _time_c3(
 	opts.session = session
 	var start := Time.get_ticks_usec()
 	var res := await C3HTTPRequest.request(
-		url, _auth_headers, C3HTTPRequest.Method.GET, "", opts
+		url, _auth_headers, HTTPClient.METHOD_GET, "", opts
 	)
 	var elapsed := Time.get_ticks_usec() - start
 	if not res.ok:
@@ -313,7 +313,7 @@ func _run_one_c3(url: String, done: Array, use_threads: bool) -> void:
 	var opts := C3HTTPRequest.Options.new()
 	opts.use_threads = use_threads
 	var res := await C3HTTPRequest.request(
-		url, _auth_headers, C3HTTPRequest.Method.GET, "", opts
+		url, _auth_headers, HTTPClient.METHOD_GET, "", opts
 	)
 	if not res.ok:
 		push_error("C3HTTPRequest failed: %s" % str(res.error))
@@ -344,7 +344,7 @@ func _run_one_c3_session(
 	opts.use_threads = use_threads
 	opts.session = session
 	var res := await C3HTTPRequest.request(
-		url, _auth_headers, C3HTTPRequest.Method.GET, "", opts
+		url, _auth_headers, HTTPClient.METHOD_GET, "", opts
 	)
 	if not res.ok:
 		push_error("C3HTTPRequest (session) failed: %s" % str(res.error))
@@ -499,7 +499,7 @@ func _time_c3_download(
 	opts.download_chunk_size = DOWNLOAD_CHUNK
 	var start := Time.get_ticks_usec()
 	var res := await C3HTTPRequest.request(
-		url, _auth_headers, C3HTTPRequest.Method.GET, "", opts
+		url, _auth_headers, HTTPClient.METHOD_GET, "", opts
 	)
 	var elapsed := Time.get_ticks_usec() - start
 	if not res.ok:

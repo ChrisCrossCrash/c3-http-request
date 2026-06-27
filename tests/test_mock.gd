@@ -297,6 +297,6 @@ class TestMockIntegration extends GutTest:
 		await C3HTTPRequest.request(
 			"https://example.com",
 			PackedStringArray(),
-			C3HTTPRequest.Method.POST
+			HTTPClient.METHOD_POST
 		)
 		assert_eq(mock.last_call["method"], HTTPClient.METHOD_POST)
