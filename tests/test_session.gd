@@ -198,6 +198,30 @@ class TestMakeKey extends GutTest:
 			session._make_key("a.com", 443, true, null, opts2)
 		)
 
+	func test_http_proxy_ignored_for_tls_requests() -> void:
+		# Only the https proxy routes a TLS connection, so an http proxy
+		# difference must not fragment the pool for https requests.
+		var opts1 := _opts()
+		var opts2 := _opts()
+		opts2.http_proxy_host = "proxy.local"
+		opts2.http_proxy_port = 8080
+		assert_eq(
+			session._make_key("a.com", 443, true, null, opts1),
+			session._make_key("a.com", 443, true, null, opts2)
+		)
+
+	func test_https_proxy_ignored_for_non_tls_requests() -> void:
+		# Only the http proxy routes a plain connection, so an https proxy
+		# difference must not fragment the pool for http requests.
+		var opts1 := _opts()
+		var opts2 := _opts()
+		opts2.https_proxy_host = "proxy.local"
+		opts2.https_proxy_port = 3128
+		assert_eq(
+			session._make_key("a.com", 80, false, null, opts1),
+			session._make_key("a.com", 80, false, null, opts2)
+		)
+
 
 ## Tests for [C3HTTPRequest.Options] defaults related to session.
 class TestOptionsSessionDefault extends GutTest:
