@@ -452,3 +452,44 @@ class TestInstantiation extends GutTest:
 	func test_instantiation_pushes_warning() -> void:
 		C3HTTPRequest.new()
 		assert_push_warning("not meant to be instantiated")
+
+
+## Saving the body to a file and streaming it as SSE are mutually exclusive:
+## SSE parsing bypasses the file-write path, so the request would leave an empty
+## file behind. The combination is rejected up front with a CLIENT error.
+class TestDownloadFileSseConflict extends GutTest:
+	const _DOWNLOAD_PATH := "user://test_sse_conflict.bin"
+
+	func after_each() -> void:
+		if FileAccess.file_exists(_DOWNLOAD_PATH):
+			DirAccess.remove_absolute(_DOWNLOAD_PATH)
+
+	func test_download_file_with_sse_returns_client_error() -> void:
+		var opts := C3HTTPRequest.Options.new()
+		opts.download_file = _DOWNLOAD_PATH
+		opts.on_sse_event = func(_data: String, _event_type: String, _id: String) -> void: pass
+		var res: C3HTTPRequest.Response = await C3HTTPRequest._Impl.new().request(
+			"https://example.com",
+			PackedStringArray(),
+			HTTPClient.METHOD_GET,
+			"",
+			opts
+		)
+		assert_false(res.ok)
+		assert_eq(res.error.kind, C3HTTPRequest.RequestError.Kind.CLIENT)
+
+	func test_download_file_with_sse_creates_no_file() -> void:
+		var opts := C3HTTPRequest.Options.new()
+		opts.download_file = _DOWNLOAD_PATH
+		opts.on_sse_event = func(_data: String, _event_type: String, _id: String) -> void: pass
+		await C3HTTPRequest._Impl.new().request(
+			"https://example.com",
+			PackedStringArray(),
+			HTTPClient.METHOD_GET,
+			"",
+			opts
+		)
+		assert_false(
+			FileAccess.file_exists(_DOWNLOAD_PATH),
+			"no file should be created when the request is rejected up front"
+		)

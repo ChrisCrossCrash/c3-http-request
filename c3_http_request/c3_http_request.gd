@@ -659,6 +659,11 @@ class _Impl:
 				_redirects_left
 			)
 
+		if not options.download_file.is_empty() and not options.on_sse_event.is_null():
+			return _fail(RequestError.client_error(
+				"download_file and on_sse_event cannot be used together."
+			))
+
 		if _cancelled(options):
 			return _fail(RequestError.cancelled("Request was cancelled."))
 		var redirects_left := (
@@ -890,9 +895,6 @@ class _Impl:
 			bytes_received += chunk.size()
 			_emit(options.on_progress, _on_worker, [bytes_received, total_bytes])
 
-		if file != null:
-			file.close()
-
 		# A server may end the final event without a trailing blank line; flush
 		# what remains. Every byte has arrived, so decode the tail in one pass.
 		if sse_mode:
@@ -902,7 +904,9 @@ class _Impl:
 					tail, sse_sink, sse_id, sse_retry, _id_field_has_nul(sse_buffer)
 				)
 
-		if file == null:
+		if file != null:
+			file.close()
+		else:
 			var decoded: Variant = _maybe_decompress_body(
 				body_bytes,
 				resp_headers,
