@@ -17,6 +17,7 @@ checkin
 chriskumm
 clampf
 cmdln
+compresslevel
 cooldown
 cval
 cwnd
