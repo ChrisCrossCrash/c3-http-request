@@ -807,6 +807,9 @@ class _Impl:
 			last_status = _emit_status_change(
 				client, last_status, options, _on_worker
 			)
+			# poll() may set STATUS_CONNECTION_ERROR if the connection drops;
+			# calling read_response_body_chunk() outside STATUS_BODY triggers
+			# an engine error.
 			if last_status != HTTPClient.STATUS_BODY:
 				break
 			var chunk: PackedByteArray = client.read_response_body_chunk()
