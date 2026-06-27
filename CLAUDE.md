@@ -43,34 +43,37 @@ The addon is a single script: [c3_http_request/c3_http_request.gd](c3_http_reque
 
 **`C3HTTPRequest`** — No `extends`, no `@tool`. Public surface:
 
-- `static func request(url, custom_headers, method, request_data, options)` → `Response` — the one async entry point. Delegates to `_impl.request()`.
+- `static func request(url, custom_headers, method, request_data, options)` → `Response` — async entry point for string bodies. Delegates to `_impl.request()`.
+- `static func request_raw(url, custom_headers, method, request_data_raw, options)` → `Response` — same as `request` but accepts a `PackedByteArray` body; defaults to `METHOD_POST`.
 - `static var _impl: _Impl` — swapped in tests via `Mock.install()` / `Mock.uninstall()` to intercept calls without touching the network.
 
 HTTP methods use Godot's native `HTTPClient.Method` enum (e.g. `HTTPClient.METHOD_GET`) directly, mirroring the native `HTTPRequest` node — there is no addon-specific method enum.
 
 **Inner classes:**
 
-- `Options` — `timeout`, `body_size_limit`, `download_chunk_size`, `accept_gzip`, `max_redirects`, `use_threads` (run the loop on a background thread, marshaling callbacks back to the main thread), `download_file`, `tls_options`, `http_proxy_host`, `http_proxy_port`, `https_proxy_host`, `https_proxy_port`, `cancellation_token`, `on_sse_event` (SSE streaming sink), `on_progress` (download progress sink), `on_status_changed` (HTTPClient status sink)
-- `Response` — `ok: bool`, `error: RequestError`, `status: int`, `headers: PackedStringArray`, `body: String`, `sse_retry_ms: int` (server's SSE `retry:` backoff, `-1` if none)
+- `Options` — `timeout`, `body_size_limit`, `download_chunk_size`, `accept_gzip`, `max_redirects`, `use_threads` (run the loop on a background thread, marshaling callbacks back to the main thread), `download_file`, `tls_options`, `http_proxy_host`, `http_proxy_port`, `https_proxy_host`, `https_proxy_port`, `cancellation_token`, `on_sse_event` (SSE streaming sink), `on_progress` (download progress sink), `on_status_changed` (HTTPClient status sink), `session` (connection pool for keep-alive reuse)
+- `Response` — `ok: bool`, `error: RequestError`, `status: int`, `headers: PackedStringArray`, `body: PackedByteArray`, `text: String` (decoded body, lazy-cached), `json: Variant` (lazy-parsed JSON, `null` on parse failure), `sse_retry_ms: int` (server's SSE `retry:` backoff, `-1` if none)
 - `RequestError` — `Kind` enum (`TRANSPORT`, `HTTP`, `CLIENT`, `CANCELLED`, `TIMEOUT`, `BODY_SIZE_LIMIT_EXCEEDED`), `kind`, `message`, `status`, factory methods, `_to_string()`
 - `CancellationToken` — `cancel()`, `is_cancelled()`
+- `Session` — connection pool for keep-alive reuse; `max_connections_per_host=6`, `idle_timeout=60.0`, `checkout(key)`/`checkin(key, client)` (mutex-protected, LIFO), `close()` (drains pool), `prune()` (evicts expired entries)
 - `_Stub` — builder returned by `Mock.stub()`; configures a canned response via `ok()`, `fail()`, or `returns()`
 - `Mock` — extends `_Impl`; install/uninstall into `_impl`, register stubs with `stub()`, inspect outgoing calls via `calls` / `call_count` / `last_call`, reset with `reset()`
 - `_Impl` — contains `request()` (the public face of the private class) with the `HTTPClient` polling loop, plus `_pump()` (the per-poll yield), `_run_threaded()`/`_threads_available()` (background-thread orchestration for `use_threads`), `_emit()` (callback dispatch, main-thread-marshaled when threaded), `_parse_url()`, `_resolve_proxies()` (per-scheme proxy routing), `_timed_out()`, `_cancelled()`, `_emit_status_change()`, `_header_value()`, `_fail()` helpers, the streaming download decompressor (`_decode_chunk()`/`_drain_decoder()`, driving a `StreamPeerGZIP` so gzip `download_file` bodies are decoded on the fly — gzip only; deflate is intentionally unsupported), and the SSE parser (`_drain_sse_buffer()`, `_find_sse_boundary()`, `_emit_sse_event()`)
 
-**Transport** is Godot's `HTTPClient` (a `RefCounted`), created per call inside `_Impl.request()`. The polling loop's single yield point is `_pump()`: in the default cooperative mode it yields to `SceneTree.process_frame` via `Engine.get_main_loop()` (no scene tree membership required from the caller); when `Options.use_threads` is set, `_Impl.request()` runs on a worker `Thread` and `_pump()` becomes a synchronous `OS.delay_usec()` so the coroutine runs straight through off the main thread.
+**Transport** is Godot's `HTTPClient` (a `RefCounted`), created fresh per call inside `_Impl.request()` or checked out from the `Session` pool when `Options.session` is set. The polling loop's single yield point is `_pump()`: in the default cooperative mode it yields to `SceneTree.process_frame` via `Engine.get_main_loop()` (no scene tree membership required from the caller); when `Options.use_threads` is set, `_Impl.request()` runs on a worker `Thread` and `_pump()` becomes a synchronous `OS.delay_usec()` so the coroutine runs straight through off the main thread.
 
-**Tests** are in [tests/](tests/) using the GUT framework (in [addons/gut/](addons/gut/)). Each file covers a focused area: `test_public_api.gd` (public API and types), `test_mock.gd` (Mock lifecycle, stubs, call recording), `test_sse_parsing.gd`, `test_url_and_routing.gd`, `test_compression.gd`, `test_headers.gd`, `test_download_file_cleanup.gd`. `TestableImpl` inside `tests/test_public_api.gd` overrides `request()` so no real HTTP calls are made.
+**Tests** are in [tests/](tests/) using the GUT framework (in [addons/gut/](addons/gut/)). Each file covers a focused area: `test_public_api.gd` (public API and types), `test_mock.gd` (Mock lifecycle, stubs, call recording), `test_sse_parsing.gd`, `test_url_and_routing.gd`, `test_compression.gd`, `test_headers.gd`, `test_redirect_behavior.gd`, `test_download_file_cleanup.gd`, `test_sse_stream.gd` (SSE streaming integration against a loopback server), `test_session.gd` (Session pool unit tests), `test_session_live.gd` (keep-alive integration tests against loopback servers). `TestableImpl` inside `tests/test_public_api.gd` overrides `request()` so no real HTTP calls are made.
 
 ## GDScript Style Guide
 
 Follow [CONTRIBUTING.md](CONTRIBUTING.md) strictly. Key rules:
 
 - **Tabs** for indentation (never spaces), one tab per level.
+- **Soft 80-character line length** — exceeding it occasionally is fine, but long lines should be the exception.
 - **Type hints are mandatory** on all parameters and return types. Use `:=` for inference; use explicit type when inference would be too broad (e.g., `instantiate()` calls).
 - Signal awaits require explicit type annotation (GDScript limitation); function awaits may use `:=`.
 - Multi-line function signatures: closing `)` goes on its own line at zero indent, before `->`.
-- `##` doc comments for classes, `@export` vars, and public methods. `#` for private methods only when non-obvious. Comments explain _why_, not _what_.
+- `##` doc comments for classes and `@export` vars; for public methods, use `##` where the name and signature alone don't tell the full story. `#` for private methods only when non-obvious. Comments explain _why_, not _what_.
 - Private members and methods prefixed with `_`.
 
 **Declaration order within a class:**
