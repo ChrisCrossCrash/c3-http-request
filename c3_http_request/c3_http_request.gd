@@ -2,7 +2,7 @@ class_name C3HTTPRequest
 ## General-purpose async HTTP client that requires no scene tree.
 ##
 ## Call the static [method request] from anywhere — no [Node] to add or
-## configure. Every call [code]await[/code]s a [code]Response[/code] carrying
+## configure. Every call [code]await[/code]s a [Response] carrying
 ## [member Response.ok] as a single failure check that covers transport
 ## errors, timeouts, and non-2xx statuses alike.
 
@@ -201,7 +201,7 @@ class Options:
 	## [code]STATUS_BODY[/code], etc. Fires once per change, in every mode
 	## (including SSE), and repeats the cycle for each hop when redirects are
 	## followed. Purely observational: the request's outcome is still reported via
-	## the returned [code]Response[/code]. Very brief intermediate states may be coalesced.
+	## the returned [Response]. Very brief intermediate states may be coalesced.
 	var on_status_changed: Callable = Callable()
 	## Optional [Session] for HTTP keep-alive connection reuse. When set, idle
 	## connections to the same host are pooled and reused across calls, reducing
@@ -498,7 +498,7 @@ class Mock extends _Impl:
 	## keys [code]url[/code] ([String]), [code]method[/code] ([int],
 	## [code]HTTPClient.METHOD_*[/code]), [code]headers[/code]
 	## ([PackedStringArray]), [code]body[/code] ([Variant]),
-	## and [code]options[/code] ([code]Options[/code]).
+	## and [code]options[/code] ([Options]).
 	var calls: Array[Dictionary] = []
 
 	## Total number of calls received since construction or the last [method reset].
@@ -514,7 +514,7 @@ class Mock extends _Impl:
 
 	var _stubs: Array = []
 
-	## Installs this mock as [member C3HTTPRequest._impl].
+	## Installs this mock as [code]C3HTTPRequest._impl[/code].
 	func install() -> void:
 		C3HTTPRequest._impl = self
 
@@ -525,7 +525,7 @@ class Mock extends _Impl:
 	## Returns a stub builder for [param url]. Omit [param url] to create
 	## the catch-all default stub, matched when no URL-specific stub exists.
 	## [br][br]Stubs are evaluated in registration order; the first exact URL
-	## match wins, then the first default stub, then an empty [code]Response[/code].
+	## match wins, then the first default stub, then an empty [Response].
 	func stub(url: String = "") -> _Stub:
 		var s := _Stub.new(url)
 		_stubs.append(s)
@@ -567,7 +567,7 @@ class Mock extends _Impl:
 
 
 ## Canned-response builder returned by [method Mock.stub]. Configure with
-## [method ok], [method fail], or [method returns], then discard — the [code]Mock[/code]
+## [method ok], [method fail], or [method returns], then discard — the [Mock]
 ## retains the stub internally.
 class _Stub:
 	var _url: String
@@ -586,7 +586,7 @@ class _Stub:
 		_preset = res
 
 	## Configures a failure response. Build [param error] with the
-	## [code]RequestError[/code] factory methods ([method RequestError.transport],
+	## [RequestError] factory methods ([method RequestError.transport],
 	## [method RequestError.timed_out], etc.) or construct one manually.
 	func fail(error: RequestError) -> void:
 		var res := Response.new()
@@ -595,7 +595,7 @@ class _Stub:
 		res.status = error.status
 		_preset = res
 
-	## Sets a [code]Response[/code] directly, bypassing [method ok] and [method fail].
+	## Sets a [Response] directly, bypassing [method ok] and [method fail].
 	func returns(response: Response) -> void:
 		_preset = response
 

@@ -258,7 +258,8 @@ To cut a release (e.g. `v0.2.0`):
     - Run the full test suite (see [Running Tests](#running-tests)).
     - Dry-run the build: `python scripts/build_asset.py v0.2.0` (confirms the tag/`VERSION` check passes and produces `build/c3_http_request_v0.2.0.zip`).
     - Preview the release body: `python scripts/extract_changelog.py v0.2.0` (prints the changelog section the workflow will publish).
-4. Commit the version bump and changelog to `main`.
+    - Regenerate the API reference docs (the generated `docs/api/` files are tracked in git and must be up to date). Use the `/generate-api-docs` Claude custom command (or follow the steps in [.claude/commands/generate-api-docs.md](.claude/commands/generate-api-docs.md) if you don't have Claude Code).
+4. Commit the version bump, changelog, and regenerated `docs/api/` files to `main`.
 5. Create an annotated tag matching `VERSION`, using the changelog section as the tag body so `git show v0.2.0` carries the same notes:
 
     ```bash
