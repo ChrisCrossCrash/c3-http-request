@@ -198,6 +198,16 @@ class TestMakeKey extends GutTest:
 			session._make_key("a.com", 443, true, null, opts2)
 		)
 
+	func test_tls_options_ignored_for_non_tls_requests() -> void:
+		# tls_options has no effect on a plain http connection, so it must not
+		# fragment the pool key for non-TLS requests.
+		var opts := _opts()
+		var tls := TLSOptions.client()
+		assert_eq(
+			session._make_key("a.com", 80, false, null, opts),
+			session._make_key("a.com", 80, false, tls, opts)
+		)
+
 	func test_http_proxy_ignored_for_tls_requests() -> void:
 		# Only the https proxy routes a TLS connection, so an http proxy
 		# difference must not fragment the pool for https requests.

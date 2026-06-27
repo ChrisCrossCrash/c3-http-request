@@ -422,7 +422,7 @@ class Session:
 		tls_options: TLSOptions,
 		options: Options
 	) -> String:
-		var tls_id := 0 if tls_options == null else tls_options.get_instance_id()
+		var tls_id := 0 if (not tls or tls_options == null) else tls_options.get_instance_id()
 		var proxy := (
 			"%s:%d" % [options.https_proxy_host, options.https_proxy_port]
 			if tls
