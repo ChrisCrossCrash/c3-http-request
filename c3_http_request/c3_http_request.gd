@@ -459,6 +459,10 @@ class Session:
 	## the oldest idle entry is closed and evicted.
 	func checkin(key: String, client: HTTPClient) -> void:
 		_mutex.lock()
+		if max_connections_per_host <= 0:
+			client.close()
+			_mutex.unlock()
+			return
 		if not _pool.has(key):
 			_pool[key] = []
 		var entries: Array = _pool[key]
