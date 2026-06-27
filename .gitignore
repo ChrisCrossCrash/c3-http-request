@@ -6,6 +6,12 @@
 # Builds
 /build/
 
+# Generated API docs XML (regenerate with: godot --headless --path . --doctool docs/xml --gdscript-docs res://c3_http_request/)
+/docs/xml/
+
+# Built MKDocs site
+/site/
+
 # Godot C#
 .mono/
 

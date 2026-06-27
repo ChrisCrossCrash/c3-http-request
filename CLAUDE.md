@@ -30,6 +30,13 @@ Tests require Godot 4.6+ on `$PATH`. CI runs on ubuntu-latest with Godot 4.6.2-s
 python scripts/build_asset.py <version>
 ```
 
+**Generate API reference docs** (run both steps from the repo root):
+
+```
+godot --headless --path . --doctool docs/xml --gdscript-docs res://c3_http_request/
+python scripts/generate_api_docs.py --outer-class C3HTTPRequest
+```
+
 ## Architecture
 
 The addon is a single script: [c3_http_request/c3_http_request.gd](c3_http_request/c3_http_request.gd).
