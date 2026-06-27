@@ -423,12 +423,11 @@ class Session:
 		options: Options
 	) -> String:
 		var tls_id := 0 if tls_options == null else tls_options.get_instance_id()
-		var proxy := "%s:%d|%s:%d" % [
-			options.http_proxy_host,
-			options.http_proxy_port,
-			options.https_proxy_host,
-			options.https_proxy_port,
-		]
+		var proxy := (
+			"%s:%d" % [options.https_proxy_host, options.https_proxy_port]
+			if tls
+			else "%s:%d" % [options.http_proxy_host, options.http_proxy_port]
+		)
 		return "%s:%d:%s:%d:%s" % [host, port, str(tls), tls_id, proxy]
 
 	## Returns a connected, non-expired client for [param key], or
