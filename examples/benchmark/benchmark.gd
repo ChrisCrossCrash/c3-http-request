@@ -69,6 +69,7 @@ var _trials: Array[_TrialConfig] = [
 # Human-readable description of the benchmark phase currently running, shown in
 # the status label alongside the client and mode of each timed call.
 var _auth_headers: PackedStringArray = []
+var _output: PackedStringArray = []
 var _phase := "idle"
 var _server := ""
 # Names the call currently running (phase + client + mode), shown in the status label.
@@ -101,7 +102,8 @@ func _ready() -> void:
 	await _bench_latency(LATENCY_URL)
 	await _bench_slow_start()
 	await _bench_download()
-	output_overlay.print_with_overlay("\nDone.")
+	_save_output()
+	_print("\nDone.")
 	_phase = "Done."
 	_show_status()
 
@@ -126,9 +128,8 @@ func _process(delta: float) -> void:
 
 func _bench_latency(url: String) -> void:
 	_server = _host_from_url(url)
-	output_overlay.print_with_overlay(
-		"\n== Single-request latency (median of %d requests) ==" % RUNS
-	)
+	_print("\n## Single-request latency (median of %d requests)" % RUNS)
+	_print("Round-trip time for a single small GET request across frame-rate caps.")
 	var rows: Array[Dictionary] = []
 	for cap: int in FRAME_CAPS:
 		Engine.max_fps = cap
@@ -149,10 +150,11 @@ func _bench_latency(url: String) -> void:
 
 func _bench_slow_start() -> void:
 	_server = _host_from_url(DOWNLOAD_URL % 0)
-	output_overlay.print_with_overlay(
-		"\n== Small download: slow-start control vs. straddled IW10"
-		+ " (median of %d runs, %d fps) ==" % [SLOW_START_REPS, SLOW_START_FPS]
+	_print(
+		"\n## Small download: slow-start control vs. straddled IW10"
+		+ " (median of %d runs, %d fps)" % [SLOW_START_REPS, SLOW_START_FPS]
 	)
+	_print("Tests how TCP slow-start affects small responses.")
 	Engine.max_fps = SLOW_START_FPS
 	# A single session shared across all sizes so the cwnd is already warm by the
 	# time the 20 KB and 400 KB rows run.
@@ -173,14 +175,15 @@ func _bench_slow_start() -> void:
 
 func _bench_download() -> void:
 	_server = _host_from_url(DOWNLOAD_URL)
-	output_overlay.print_with_overlay(
-		"\n== File download to disk (median of %d runs, %d fps) ==" % [
+	_print(
+		"\n## File download to disk (median of %d runs, %d fps)" % [
 			DOWNLOAD_REPS, DOWNLOAD_FPS
 		]
 	)
-	output_overlay.print_with_overlay(
-		"Target: %s" % DOWNLOAD_URL.replace("%d", "<byte count>")
+	_print(
+		"Target: %s" % DOWNLOAD_URL.replace("%d", "{byte_count}")
 	)
+	_print("Measures throughput for downloading bodies of increasing size to disk.")
 	Engine.max_fps = DOWNLOAD_FPS
 	# A session shared across sizes so its connections are already warm by the
 	# time timing begins.
@@ -283,31 +286,23 @@ func _time_native(
 # --- Output ---
 
 
-# Prints the markdown main table (C3/native × cooperative/threaded) followed by
-# the C3 (session) sub-table. col0 is the swept dimension's header ("Frame rate"
-# or "Body size"); rows each carry a `label` and the `samples` dict from _collect.
+# Prints a merged median table (all six variants) followed by the five-number
+# summary table. col0 is the swept dimension's header; rows each carry a `label`
+# and the `samples` dict from _collect.
 func _emit_tables(col0: String, rows: Array[Dictionary]) -> void:
-	var main_headers: Array[String] = [
-		col0, "C3 cooperative", "native cooperative", "C3 threaded", "native threaded"
+	var headers: Array[String] = [
+		col0, "nat_coop", "c3_coop", "c3s_coop", "nat_thr", "c3_thr", "c3s_thr"
 	]
-	var main_cells: Array[Array] = []
+	var cells: Array[Array] = []
 	for row: Dictionary in rows:
 		var s: Dictionary = row["samples"]
-		main_cells.append([
-			row["label"], _fmt(s["c3_coop"]), _fmt(s["nat_coop"]),
-			_fmt(s["c3_thr"]), _fmt(s["nat_thr"])
+		cells.append([
+			row["label"],
+			_fmt(s["nat_coop"]), _fmt(s["c3_coop"]), _fmt(s["c3s_coop"]),
+			_fmt(s["nat_thr"]), _fmt(s["c3_thr"]), _fmt(s["c3s_thr"]),
 		])
-	_print_markdown_table(main_headers, main_cells)
-	var session_headers: Array[String] = [
-		col0, "C3 session cooperative", "C3 session threaded"
-	]
-	var session_cells: Array[Array] = []
-	for row: Dictionary in rows:
-		var s: Dictionary = row["samples"]
-		session_cells.append([
-			row["label"], _fmt(s["c3s_coop"]), _fmt(s["c3s_thr"])
-		])
-	_print_markdown_table(session_headers, session_cells)
+	_print_markdown_table(headers, cells)
+	_emit_stats_table(rows)
 
 
 # Prints a GitHub-flavored markdown table, each column padded to its widest cell
@@ -323,11 +318,11 @@ func _print_markdown_table(headers: Array[String], rows: Array[Array]) -> void:
 	var separators: Array[String] = []
 	for w: int in widths:
 		separators.append("-".repeat(w))
-	output_overlay.print_with_overlay("")
-	output_overlay.print_with_overlay(_md_row(headers, widths))
-	output_overlay.print_with_overlay(_md_row(separators, widths))
+	_print("")
+	_print(_md_row(headers, widths))
+	_print(_md_row(separators, widths))
 	for row: Array in rows:
-		output_overlay.print_with_overlay(_md_row(row, widths))
+		_print(_md_row(row, widths))
 
 
 # Joins one row's cells into a padded "| a | b | c |" markdown line.
@@ -338,19 +333,67 @@ func _md_row(cells: Array, widths: Array[int]) -> String:
 	return "| " + " | ".join(parts) + " |"
 
 
+func _print(text: String) -> void:
+	output_overlay.print_with_overlay(text)
+	_output.append(text)
+
+
+func _save_output() -> void:
+	var file := FileAccess.open("res://BENCHMARK.md", FileAccess.WRITE)
+	if file == null:
+		push_error("Failed to open BENCHMARK.md for writing: %d" % FileAccess.get_open_error())
+		return
+	file.store_string("\n".join(_output) + "\n")
+
+
+# Prints a five-number summary markdown table (min, Q1, median, Q3, max) for all
+# trials and rows so the full spread is visible alongside the median tables.
+func _emit_stats_table(rows: Array[Dictionary]) -> void:
+	var headers: Array[String] = ["Label", "Trial", "Min", "Q1", "Median", "Q3", "Max"]
+	var cells: Array[Array] = []
+	for row: Dictionary in rows:
+		var label: String = row["label"]
+		var s: Dictionary = row["samples"]
+		for trial: _TrialConfig in _trials:
+			var samples: Array[int] = (s[trial.id] as Array[int]).duplicate()
+			samples.sort()
+			var n := samples.size()
+			cells.append([
+				label,
+				trial.id,
+				"%.1f" % (samples[0] / 1000.0),
+				"%.1f" % (_percentile_us(samples, 0.25) / 1000.0),
+				"%.1f" % _median_ms(samples),
+				"%.1f" % (_percentile_us(samples, 0.75) / 1000.0),
+				"%.1f" % (samples[n - 1] / 1000.0),
+			])
+	_print_markdown_table(headers, cells)
+
+
 func _print_environment() -> void:
 	var v := Engine.get_version_info()
 	var renderer := ProjectSettings.get_setting(
 		"rendering/renderer/rendering_method", "?"
 	) as String
-	output_overlay.print_with_overlay("C3HTTPRequest benchmark vs native HTTPRequest")
-	output_overlay.print_with_overlay("commit %s" % _git_commit())
-	output_overlay.print_with_overlay("Godot %s | %s | %s | %s renderer" % [
+	_print("# C3HTTPRequest benchmark vs native HTTPRequest")
+	_print("```")
+	_print("commit %s" % _git_commit())
+	_print("Godot %s | %s | %s | %s renderer" % [
 		v.get("string", "?"), OS.get_name(), OS.get_processor_name(), renderer
 	])
-	output_overlay.print_with_overlay(
-		"All timing values are in milliseconds: median (Q1, Q3)."
+	_print("```")
+	_print(
+		"All timing values are in milliseconds. Tables show medians; five-number summary follows each section."
 	)
+	_print("")
+	_print("| ID       | Description                                              |")
+	_print("| -------- | -------------------------------------------------------- |")
+	_print("| nat_coop | native HTTPRequest node, cooperative (default) polling   |")
+	_print("| c3_coop  | C3HTTPRequest, cooperative (default) polling             |")
+	_print("| c3s_coop | C3HTTPRequest, cooperative polling, session (keep-alive) |")
+	_print("| nat_thr  | native HTTPRequest node, threaded polling                |")
+	_print("| c3_thr   | C3HTTPRequest, threaded polling                          |")
+	_print("| c3s_thr  | C3HTTPRequest, threaded polling, session (keep-alive)    |")
 
 
 # Refreshes the on-screen status from the current _phase. With a trial given, a
@@ -406,17 +449,9 @@ func _git_commit() -> String:
 	return commit
 
 
-# Formats a sample set as "median ms (IQR width)". The interquartile range is the
-# spread of the middle 50%, so it exposes the per-cell noise floor while staying
-# robust to the occasional outlier (a single dropped frame or network hiccup) that
-# a raw min–max range would let dominate — a tight, frame-quantized cell reads as
-# IQR ~0, a noisy one as a visibly larger IQR.
 func _fmt(samples: Array[int]) -> String:
 	samples.sort()
-	var median := _median_ms(samples)
-	var q1 := _percentile_us(samples, 0.25) / 1000.0
-	var q3 := _percentile_us(samples, 0.75) / 1000.0
-	return "%.1f (%.1f, %.1f)" % [median, q1, q3]
+	return "%.1f" % _median_ms(samples)
 
 
 func _median_ms(samples: Array[int]) -> float:
@@ -431,8 +466,8 @@ func _median_ms(samples: Array[int]) -> float:
 
 
 # The q-quantile (q in [0, 1]) of a sorted sample set, in microseconds, by linear
-# interpolation between the two ranks the quantile falls between. Used for the
-# IQR (q=0.25 and q=0.75) in _fmt. Assumes samples is already sorted.
+# interpolation between the two ranks the quantile falls between. Assumes samples
+# is already sorted.
 func _percentile_us(samples: Array[int], q: float) -> float:
 	var n := samples.size()
 	if n == 0:
