@@ -1,2 +1,4 @@
-docs/api/
-build/
+/addons/
+/docs/api/
+/build/
+/BENCHMARK.md
