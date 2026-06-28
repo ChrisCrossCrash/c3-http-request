@@ -51,24 +51,35 @@ All results are medians, so a request occasionally slowed by system noise doesn'
 
 **Threaded mode is nearly flat across frame caps.** Both clients sit at ~161–164 ms uncapped and ~166.5 ms at every capped rate — they do _not_ climb with the frame cap the way cooperative mode does (compare native cooperative's 183 → 200 → 233 ms). The request runs on a background thread that completes the whole connection (resolve, connect, send, receive) in one shot at network speed, ~161 ms. The only frame-dependent cost left is delivery: the finished result is handed back to the awaiting main-thread coroutine on the next `process_frame`, so the measured time is the true network time rounded _up_ to the next frame boundary — at most one frame of overhead. That all three capped rates land on the same ~166.5 ms is a coincidence of the caps chosen: ~161 ms rounds up to 20 frames at 120 fps, 10 frames at 60 fps, and 5 frames at 30 fps, and all three products fall at ~166.7 ms. Unlike cooperative mode, threaded mode never accumulates per-frame polling latency, so it stays flat instead of rising as the cap drops.
 
-**In cooperative mode, C3HTTPRequest resolves ~1 frame sooner than native.** Each frame adds one cooperative poll. The difference between C3 and native at each capped rate matches almost exactly one additional frame period:
+**In cooperative mode, C3HTTPRequest resolves ~1 frame sooner than native.** The difference between C3 and native at each capped rate matches almost exactly one additional frame period:
 
 - 120 fps (8.3 ms/frame): native is 8.4 ms slower than C3 — one frame
 - 60 fps (16.7 ms/frame): native is 16.7 ms slower than C3 — one frame
 - 30 fps (33.3 ms/frame): native is 33.4 ms slower than C3 — one frame
 
-The native node requires one more cooperative poll per request than C3HTTPRequest, regardless of frame rate. The mechanism is visible in [`scene/main/http_request.cpp`](https://github.com/godotengine/godot/blob/4.7-stable/scene/main/http_request.cpp): the `STATUS_CONNECTED` case sends the request and immediately `return false`, which defers the next poll to the following frame:
+The native node burns one extra frame per request, regardless of frame rate, because of how its polling loop is structured. `HTTPRequest` runs one iteration of a `switch (client->get_status())` per frame, in [`scene/main/http_request.cpp`](https://github.com/godotengine/godot/blob/4.7-stable/scene/main/http_request.cpp#L415-L420). When `client->poll()` advances the status, that transition isn't acted on until the _next_ frame, when the switch is evaluated again. The `STATUS_REQUESTING` case shows it:
 
 ```cpp
-case HTTPClient::STATUS_CONNECTED: {
-    // ...
-    Error err = client->request(method, request_string, headers, ...);
-    request_sent = true;
-    return false; // come back next frame
+case HTTPClient::STATUS_REQUESTING: {
+    client->poll();   // headers may arrive here → status becomes STATUS_BODY
+    return false;     // but we've already branched; bail and come back next frame
 } break;
 ```
 
-C3HTTPRequest sends the request and then polls in a tight loop before deciding whether to yield — if the response has already arrived, it proceeds without waiting a frame. At a capped frame rate, `Options.use_threads = true` eliminates that overhead for both clients.
+On the frame the headers arrive, `poll()` moves the client to `STATUS_BODY`, but the switch has already committed to the `STATUS_REQUESTING` branch, so it returns and waits. Only on the following frame does the switch re-read the status, fall into the `STATUS_BODY` case, and read the response. The status was updated one frame before it was checked.
+
+C3HTTPRequest re-reads the status in the same loop iteration, right after polling, and proceeds without yielding the moment the request phase ends:
+
+```gdscript
+while true:
+    client.poll()                                        # → STATUS_BODY
+    if client.get_status() != HTTPClient.STATUS_REQUESTING:
+        break                                            # proceed this frame, no yield
+    ...
+    await _pump(tree, _on_worker)
+```
+
+So a status transition that costs native a frame costs C3 nothing. This is the same mechanism at every status boundary; the `STATUS_REQUESTING` → `STATUS_BODY` transition is the one that lands inside the measured window. At a capped frame rate, `Options.use_threads = true` eliminates this overhead for both clients.
 
 **C3 (session) eliminates connection-establishment overhead entirely.** When `Options.session` is set to a shared `Session` object, C3HTTPRequest reuses the existing TLS/TCP connection instead of opening a new one. The warmup requests pre-fill the session's connection pool so each timed call finds a ready connection. Measured times drop to 34–67 ms across frame caps — compared to 161–233 ms without a session — eliminating roughly 125 ms of TCP and TLS handshake overhead per request. Session latency still grows with lower frame caps (the main-thread coroutine still waits on `process_frame`), but the absolute numbers are so small that even at 30 fps the time is under 70 ms. Cooperative and threaded are within 2 ms of each other at every cap, since the connection-setup time that threading could overlap is already gone.
 
