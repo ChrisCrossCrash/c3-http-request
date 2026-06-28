@@ -349,7 +349,7 @@ func _print_environment() -> void:
 		v.get("string", "?"), OS.get_name(), OS.get_processor_name(), renderer
 	])
 	output_overlay.print_with_overlay(
-		"All timing values are medians in milliseconds; IQR in parentheses."
+		"All timing values are in milliseconds: median (Q1, Q3)."
 	)
 
 
@@ -413,8 +413,10 @@ func _git_commit() -> String:
 # IQR ~0, a noisy one as a visibly larger IQR.
 func _fmt(samples: Array[int]) -> String:
 	samples.sort()
-	var iqr := (_percentile_us(samples, 0.75) - _percentile_us(samples, 0.25)) / 1000.0
-	return "%.2f (%.1f)" % [_median_ms(samples), iqr]
+	var median := _median_ms(samples)
+	var q1 := _percentile_us(samples, 0.25) / 1000.0
+	var q3 := _percentile_us(samples, 0.75) / 1000.0
+	return "%.1f (%.1f, %.1f)" % [median, q1, q3]
 
 
 func _median_ms(samples: Array[int]) -> float:
