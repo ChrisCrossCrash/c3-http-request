@@ -153,7 +153,7 @@ See the [Response reference](docs/reference/response.md) for full details.
 | `https_proxy_port`    | `int`               | `-1`    | Port of `https_proxy_host`. Ignored when `https_proxy_host` is empty.                                                                                                                          |
 | `cancellation_token`  | `CancellationToken` | `null`  | Token for cancelling the request. `null` disables cancellation support. See [Cancellation](docs/guides/cancellation.md).                                                                       |
 | `on_sse_event`        | `Callable`          | empty   | When set, parse a 2xx body as an SSE stream and invoke this per event. See [Server-Sent Events](docs/guides/sse.md).                                                                           |
-| `on_progress`         | `Callable`          | empty   | When set, invoke `(bytes_received, total_bytes)` per chunk as the body downloads. See [Download progress](docs/guides/download-progress.md).                                                   |
+| `on_progress`         | `Callable`          | empty   | When set, invoke `(bytes_received, total_bytes)` per chunk as the body downloads. `total_bytes` is `-1` when the server sends no `Content-Length` (e.g. chunked responses). See [Download progress](docs/guides/download-progress.md).                                                   |
 | `on_status_changed`   | `Callable`          | empty   | When set, invoke `(status)` each time the `HTTPClient` status changes. See [Connection status](docs/guides/connection-status.md).                                                              |
 | `session`             | `Session`           | `null`  | Connection pool for HTTP keep-alive reuse. `null` opens a fresh connection per call. See [Sessions (Keep-Alive)](docs/guides/sessions.md).                                                     |
 
@@ -167,7 +167,7 @@ When `res.ok` is `false`, `res.error` is a `RequestError` describing what went w
 | -------------------------------------------- | -------------------------------------------------------------------------- |
 | `RequestError.Kind.TRANSPORT`                | No usable HTTP response (DNS, connection, TLS, or request could not start) |
 | `RequestError.Kind.HTTP`                     | A non-2xx status was received                                              |
-| `RequestError.Kind.CLIENT`                   | The request was rejected before being sent (e.g. an invalid URL)           |
+| `RequestError.Kind.CLIENT`                   | The request was rejected before being sent (e.g. an invalid argument)      |
 | `RequestError.Kind.TIMEOUT`                  | No response was received before `Options.timeout` elapsed                  |
 | `RequestError.Kind.CANCELLED`                | The request was cancelled via a `CancellationToken`                        |
 | `RequestError.Kind.BODY_SIZE_LIMIT_EXCEEDED` | The response body exceeded `Options.body_size_limit`                       |
