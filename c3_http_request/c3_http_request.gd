@@ -7,7 +7,7 @@ class_name C3Http
 ## errors, timeouts, and non-2xx statuses alike.
 
 ## The installed version of this addon, e.g. for logging or feature gating.
-const VERSION := "v0.3.1"
+const VERSION := "v0.4.0"
 
 static var _impl: _Impl = _Impl.new()
 

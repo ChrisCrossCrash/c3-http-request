@@ -15,7 +15,7 @@ Call the static [`request()`](#method-request) from anywhere — no [`Node`](htt
 
 ## Constants
 
-**`VERSION` = `"v0.3.1"`**
+**`VERSION` = `"v0.4.0"`**
 
 The installed version of this addon, e.g. for logging or feature gating.
 
