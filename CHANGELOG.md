@@ -8,13 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- `Response.sse_retry_ms` — the server's last SSE `retry:` value (suggested reconnect backoff, in milliseconds), or `-1` when the stream sent none or the response was not an SSE stream.
+- `Options.session` and the new `Session` class — opt-in HTTP keep-alive connection pooling.
+- [MkDocs documentation site](docs/) and supporting structure for publishing the API reference and guides.
 
 ### Changed
 
 - **Breaking:** the class has been renamed from `C3HTTPRequest` to `C3Http`. All references to `C3HTTPRequest.*` must be updated to `C3Http.*` (e.g. `C3Http.request()`, `C3Http.Options`, `C3Http.Response`).
-- **Breaking:** the `Options.on_sse_event` callback now receives a third argument, `last_event_id: String`, so its signature is `on_sse_event.call(data, event_type, last_event_id)`. Existing two-argument sinks must add the parameter. `last_event_id` is the stream's `id:` cursor and persists across events per the SSE spec — an event with no `id:` line still reports the most recent one. Together with `Response.sse_retry_ms`, this gives a caller everything needed to reconnect a dropped stream (echo the id as a `Last-Event-ID` header after waiting the suggested backoff); the client still does not auto-reconnect itself.
+- **Breaking:** the `Options.on_sse_event` callback now receives a third argument, `last_event_id: String`, so its signature is `on_sse_event.call(data, event_type, last_event_id)`. Existing two-argument sinks must add the parameter. `last_event_id` is the stream's `id:` cursor and persists across events per the SSE spec — an event with no `id:` line still reports the most recent one. Together with a new `Response.sse_retry_ms` property, this gives a caller everything needed to reconnect a dropped stream (echo the id as a `Last-Event-ID` header after waiting the suggested backoff); the client still does not auto-reconnect itself.
 - **Breaking:** the addon-specific `Method` enum has been removed in favor of Godot's native `HTTPClient.Method`, mirroring `HTTPRequest` and dropping an internal translation layer. Migrate by replacing `C3HTTPRequest.Method.GET` with `HTTPClient.METHOD_GET`, `C3HTTPRequest.Method.POST` with `HTTPClient.METHOD_POST`, and so on for the remaining methods.
+- Setting both `Options.download_file` and `Options.on_sse_event` on the same request is now rejected up front with a `CLIENT` error rather than producing undefined behavior — the two modes stream the response body in mutually exclusive ways.
+
+### Fixed
+
+- Each redirect hop's connection is now closed before the next hop is followed, releasing the server-side connection slot immediately instead of holding it open for the remainder of the redirect chain.
 
 ## [0.3.1] - 2026-06-22
 
