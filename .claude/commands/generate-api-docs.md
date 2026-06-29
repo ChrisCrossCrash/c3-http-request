@@ -23,3 +23,6 @@ mkdocs build --strict
 ```
 
 `--strict` promotes warnings (broken links, missing pages) to errors. After all three steps complete, inspect the generated files in `docs/api/` for correctness (types, cross-links, method signatures, descriptions), note any build warnings or errors, and report your findings.
+
+> [!NOTE]
+> `mkdocs build` will always print a warning block from the Material for MkDocs team about upcoming MkDocs 2.0 breaking changes. This is expected and can be ignored — it is not a build error.
