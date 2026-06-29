@@ -72,6 +72,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Initial release: static, async HTTP client for Godot 4 with no scene-tree requirement. `await C3HTTPRequest.request(...)` and check `response.ok` to cover transport failures, timeouts, and non-2xx statuses with a single check. Per-request `Options` for timeout, body size limit, gzip decompression, redirect control, custom TLS, proxy, and download-to-file; cancellation tokens; and SSE, progress, and status-change callbacks.
 
+[0.4.0]: https://github.com/ChrisCrossCrash/c3-http-request/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/ChrisCrossCrash/c3-http-request/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/ChrisCrossCrash/c3-http-request/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ChrisCrossCrash/c3-http-request/compare/v0.1.0...v0.2.0
