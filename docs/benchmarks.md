@@ -15,7 +15,7 @@ Each scenario tests two polling modes. In **cooperative** mode (the default for 
 | Renderer         | forward_plus (Vulkan), NVIDIA GeForce RTX 4070                                                                                                                                                                              |
 | Server           | Django/Daphne/Nginx on Amazon Lightsail (Ubuntu, 2 vCPUs, 512 MB RAM, Virginia Zone A) — [source](https://github.com/ChrisCrossCrash/chriskumm.com_django/blob/5c287dc02169d61a161ea12264c9641892b9dea5/benchmark/views.py) |
 | Server TCP       | BBR congestion control, fq qdisc, `tcp_slow_start_after_idle=0`                                                                                                                                                             |
-| Benchmark script | [`examples/benchmark/`](examples/benchmark/)                                                                                                                                                                                |
+| Benchmark script | [`examples/benchmark/`](https://github.com/ChrisCrossCrash/c3-http-request/blob/main/examples/benchmark/)                                                                                                                   |
 | Run command      | `godot --path . --no-debug examples/benchmark/benchmark.tscn`                                                                                                                                                               |
 
 > [!NOTE]
