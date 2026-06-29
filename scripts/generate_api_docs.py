@@ -330,7 +330,7 @@ def generate_page(
             heading = f"{_md_type(mtype, known_classes)} {mname}"
             if mdefault is not None:
                 heading += f" = `{mdefault}`"
-            out.append(f"### {heading} {{ #property-{mname} }}\n")
+            out.append(f'<a id="property-{mname}"></a>\n\n### {heading}\n')
             mdesc = _bbcode_to_md(_text(m), outer_class, known_classes)
             if mdesc:
                 out.append(f"{mdesc}\n")
@@ -341,7 +341,7 @@ def generate_page(
         for m in pub_methods:
             ret, sig = _method_signature(m, outer_class)
             out.append(
-                f"### {_md_type(ret, known_classes)} `{sig}` {{ #method-{m.get('name', '')} }}\n"
+                f'<a id="method-{m.get("name", "")}"></a>\n\n### {_md_type(ret, known_classes)} `{sig}`\n'
             )
             mdesc = _bbcode_to_md(
                 _text(m.find("description")), outer_class, known_classes

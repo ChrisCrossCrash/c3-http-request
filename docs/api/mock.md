@@ -42,33 +42,47 @@ func test_example() -> void:
 
 ## Property Descriptions
 
-### `Dictionary[]` calls = `[]` { #property-calls }
+<a id="property-calls"></a>
+
+### `Dictionary[]` calls = `[]`
 
 Recorded calls in order, newest last. Each entry is a [`Dictionary`](https://docs.godotengine.org/en/stable/classes/class_dictionary.html#class-dictionary) with keys `url` ([`String`](https://docs.godotengine.org/en/stable/classes/class_string.html#class-string)), `method` ([int], `HTTPClient.METHOD_*`), `headers` ([`PackedStringArray`](https://docs.godotengine.org/en/stable/classes/class_packedstringarray.html#class-packedstringarray)), `body` ([`Variant`](https://docs.godotengine.org/en/stable/classes/class_variant.html#class-variant)), and `options` ([`Options`](options.md)).
 
-### `int` call_count { #property-call_count }
+<a id="property-call_count"></a>
+
+### `int` call_count
 
 Total number of calls received since construction or the last [`reset()`](#method-reset).
 
-### [`Dictionary`](https://docs.godotengine.org/en/stable/classes/class_dictionary.html#class-dictionary) last_call { #property-last_call }
+<a id="property-last_call"></a>
+
+### [`Dictionary`](https://docs.godotengine.org/en/stable/classes/class_dictionary.html#class-dictionary) last_call
 
 The most recent call dictionary, or an empty [`Dictionary`](https://docs.godotengine.org/en/stable/classes/class_dictionary.html#class-dictionary) if no calls have been made yet.
 
 ## Method Descriptions
 
-### `void` `install()` { #method-install }
+<a id="method-install"></a>
+
+### `void` `install()`
 
 Installs this mock as `C3Http._impl`.
 
-### `void` `uninstall()` { #method-uninstall }
+<a id="method-uninstall"></a>
+
+### `void` `uninstall()`
 
 Uninstalls this mock and restores normal request behavior.
 
-### `_Stub` `stub(url: String = "")` { #method-stub }
+<a id="method-stub"></a>
+
+### `_Stub` `stub(url: String = "")`
 
 Returns a stub builder for `url`. Omit `url` to create the catch-all default stub, matched when no URL-specific stub exists.
 Stubs are evaluated in registration order; the first exact URL match wins, then the first default stub, then an empty [`Response`](response.md).
 
-### `void` `reset()` { #method-reset }
+<a id="method-reset"></a>
+
+### `void` `reset()`
 
 Clears all recorded calls and registered stubs.

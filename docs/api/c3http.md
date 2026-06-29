@@ -21,7 +21,9 @@ The installed version of this addon, e.g. for logging or feature gating.
 
 ## Method Descriptions
 
-### [`Response`](response.md) `request(url: String, custom_headers: PackedStringArray = PackedStringArray(), method: HTTPClient.Method = 0, request_data: String = "", options: Options = null) static` { #method-request }
+<a id="method-request"></a>
+
+### [`Response`](response.md) `request(url: String, custom_headers: PackedStringArray = PackedStringArray(), method: HTTPClient.Method = 0, request_data: String = "", options: Options = null) static`
 
 Sends an HTTP request to `url` and returns the response.
 
@@ -33,7 +35,9 @@ Sends an HTTP request to `url` and returns the response.
 
 `options` controls timeout, redirects, and other per-request settings; `null` uses all defaults.
 
-### [`Response`](response.md) `request_raw(url: String, custom_headers: PackedStringArray = PackedStringArray(), method: HTTPClient.Method = 2, request_data_raw: PackedByteArray = PackedByteArray(), options: Options = null) static` { #method-request_raw }
+<a id="method-request_raw"></a>
+
+### [`Response`](response.md) `request_raw(url: String, custom_headers: PackedStringArray = PackedStringArray(), method: HTTPClient.Method = 2, request_data_raw: PackedByteArray = PackedByteArray(), options: Options = null) static`
 
 Sends an HTTP request with a raw byte-array body, like [`request()`](#method-request) but the body is sent as-is without UTF-8 encoding. Use for binary payloads (encoded files, serialized data, custom binary protocols).
 

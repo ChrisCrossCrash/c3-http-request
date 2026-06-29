@@ -37,36 +37,52 @@ Structured error placed on [`Response.error`](response.md#property-error) when [
 
 ## Property Descriptions
 
-### `RequestError.Kind` kind = `0` { #property-kind }
+<a id="property-kind"></a>
+
+### `RequestError.Kind` kind = `0`
 
 Broad category of failure. One of the `Kind` values.
 
-### [`String`](https://docs.godotengine.org/en/stable/classes/class_string.html#class-string) message = `""` { #property-message }
+<a id="property-message"></a>
+
+### [`String`](https://docs.godotengine.org/en/stable/classes/class_string.html#class-string) message = `""`
 
 Human-readable description. Never empty.
 
-### `int` status = `0` { #property-status }
+<a id="property-status"></a>
+
+### `int` status = `0`
 
 HTTP status code, or `0` when not applicable.
 
 ## Method Descriptions
 
-### [`RequestError`](requesterror.md) `transport(p_message: String) static` { #method-transport }
+<a id="method-transport"></a>
+
+### [`RequestError`](requesterror.md) `transport(p_message: String) static`
 
 Builds an error for a transport-level failure with no usable HTTP response.
 
-### [`RequestError`](requesterror.md) `timed_out(p_message: String) static` { #method-timed_out }
+<a id="method-timed_out"></a>
+
+### [`RequestError`](requesterror.md) `timed_out(p_message: String) static`
 
 Builds an error for a request that received no response before the timeout.
 
-### [`RequestError`](requesterror.md) `client_error(p_message: String) static` { #method-client_error }
+<a id="method-client_error"></a>
+
+### [`RequestError`](requesterror.md) `client_error(p_message: String) static`
 
 Builds an error for a request rejected before being sent.
 
-### [`RequestError`](requesterror.md) `cancelled(p_message: String) static` { #method-cancelled }
+<a id="method-cancelled"></a>
+
+### [`RequestError`](requesterror.md) `cancelled(p_message: String) static`
 
 Builds an error for a caller-initiated cancellation.
 
-### [`RequestError`](requesterror.md) `body_size_limit_exceeded(p_message: String) static` { #method-body_size_limit_exceeded }
+<a id="method-body_size_limit_exceeded"></a>
+
+### [`RequestError`](requesterror.md) `body_size_limit_exceeded(p_message: String) static`
 
 Builds an error for a response body that exceeded [`Options.body_size_limit`](options.md#property-body_size_limit).

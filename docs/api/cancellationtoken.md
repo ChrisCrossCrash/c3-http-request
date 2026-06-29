@@ -13,10 +13,14 @@ Token passed to [`Options.cancellation_token`](options.md#property-cancellation_
 
 ## Method Descriptions
 
-### `void` `cancel()` { #method-cancel }
+<a id="method-cancel"></a>
+
+### `void` `cancel()`
 
 Cancels any in-flight request holding this token. Subsequent calls have no effect.
 
-### `bool` `is_cancelled()` { #method-is_cancelled }
+<a id="method-is_cancelled"></a>
+
+### `bool` `is_cancelled()`
 
 Returns `true` if [`cancel()`](#method-cancel) has been called.
