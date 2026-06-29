@@ -248,10 +248,10 @@ class TestDropRetry extends GutTest:
 		opts.session = session
 		opts.use_threads = use_threads
 		opts.timeout = 5.0
-		var seed: C3Http.Response = await _impl.request(
+		var init_res: C3Http.Response = await _impl.request(
 			url, PackedStringArray(), HTTPClient.METHOD_GET, "", opts
 		)
-		assert_true(seed.ok, "seed request must succeed: %s" % str(seed.error))
+		assert_true(init_res.ok, "seed request must succeed: %s" % str(init_res.error))
 		return session
 
 	# GET on a pooled connection the server dropped is retried transparently.
