@@ -1,37 +1,37 @@
 extends GutTest
 
 
-## Tests for [C3HTTPRequest.Mock] install/uninstall lifecycle.
+## Tests for [C3Http.Mock] install/uninstall lifecycle.
 class TestMockLifecycle extends GutTest:
-	var mock: C3HTTPRequest.Mock
+	var mock: C3Http.Mock
 
 	func before_each() -> void:
-		mock = C3HTTPRequest.Mock.new()
+		mock = C3Http.Mock.new()
 
 	func after_each() -> void:
 		mock.uninstall()
 
 	func test_install_sets_impl_to_mock() -> void:
 		mock.install()
-		assert_eq(C3HTTPRequest._impl, mock)
+		assert_eq(C3Http._impl, mock)
 
 	func test_uninstall_replaces_impl_with_non_mock() -> void:
 		mock.install()
 		mock.uninstall()
-		assert_false(C3HTTPRequest._impl is C3HTTPRequest.Mock)
+		assert_false(C3Http._impl is C3Http.Mock)
 
 	func test_uninstall_without_install_is_safe() -> void:
 		mock.uninstall()
-		assert_false(C3HTTPRequest._impl is C3HTTPRequest.Mock)
+		assert_false(C3Http._impl is C3Http.Mock)
 
 
 ## Tests for call recording: [member Mock.calls], [member Mock.call_count],
 ## and [member Mock.last_call].
 class TestMockCallRecording extends GutTest:
-	var mock: C3HTTPRequest.Mock
+	var mock: C3Http.Mock
 
 	func before_each() -> void:
-		mock = C3HTTPRequest.Mock.new()
+		mock = C3Http.Mock.new()
 		mock.install()
 
 	func after_each() -> void:
@@ -55,19 +55,19 @@ class TestMockCallRecording extends GutTest:
 		var headers := PackedStringArray(["X-Foo: bar"])
 		mock.request(
 			"https://example.com", headers,
-			HTTPClient.METHOD_GET, "", C3HTTPRequest.Options.new()
+			HTTPClient.METHOD_GET, "", C3Http.Options.new()
 		)
 		assert_eq(mock.calls[0]["headers"], headers)
 
 	func test_request_records_body() -> void:
 		mock.request(
 			"https://example.com", PackedStringArray(),
-			HTTPClient.METHOD_POST, "hello", C3HTTPRequest.Options.new()
+			HTTPClient.METHOD_POST, "hello", C3Http.Options.new()
 		)
 		assert_eq(mock.calls[0]["body"], "hello")
 
 	func test_request_records_options() -> void:
-		var opts := C3HTTPRequest.Options.new()
+		var opts := C3Http.Options.new()
 		opts.timeout = 42.0
 		mock.request("https://example.com", PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
 		assert_eq(mock.calls[0]["options"], opts)
@@ -90,18 +90,18 @@ class TestMockCallRecording extends GutTest:
 
 	func _request(
 		url: String, method: int = HTTPClient.METHOD_GET
-	) -> C3HTTPRequest.Response:
+	) -> C3Http.Response:
 		return mock.request(
-			url, PackedStringArray(), method, "", C3HTTPRequest.Options.new()
+			url, PackedStringArray(), method, "", C3Http.Options.new()
 		)
 
 
 ## Tests for [method Mock.reset].
 class TestMockReset extends GutTest:
-	var mock: C3HTTPRequest.Mock
+	var mock: C3Http.Mock
 
 	func before_each() -> void:
-		mock = C3HTTPRequest.Mock.new()
+		mock = C3Http.Mock.new()
 		mock.install()
 
 	func after_each() -> void:
@@ -110,7 +110,7 @@ class TestMockReset extends GutTest:
 	func test_reset_clears_calls() -> void:
 		mock.request(
 			"https://example.com", PackedStringArray(),
-			HTTPClient.METHOD_GET, "", C3HTTPRequest.Options.new()
+			HTTPClient.METHOD_GET, "", C3Http.Options.new()
 		)
 		mock.reset()
 		assert_true(mock.calls.is_empty())
@@ -120,7 +120,7 @@ class TestMockReset extends GutTest:
 		mock.reset()
 		var res := mock.request(
 			"https://example.com", PackedStringArray(),
-			HTTPClient.METHOD_GET, "", C3HTTPRequest.Options.new()
+			HTTPClient.METHOD_GET, "", C3Http.Options.new()
 		)
 		assert_eq(res.status, 0)
 		assert_true(res.body.is_empty())
@@ -128,10 +128,10 @@ class TestMockReset extends GutTest:
 
 ## Tests for [method _Stub.ok].
 class TestStubOk extends GutTest:
-	var mock: C3HTTPRequest.Mock
+	var mock: C3Http.Mock
 
 	func before_each() -> void:
-		mock = C3HTTPRequest.Mock.new()
+		mock = C3Http.Mock.new()
 		mock.install()
 
 	func after_each() -> void:
@@ -159,67 +159,67 @@ class TestStubOk extends GutTest:
 		mock.stub().ok({})
 		assert_eq(_request().json, {})
 
-	func _request() -> C3HTTPRequest.Response:
+	func _request() -> C3Http.Response:
 		return mock.request(
 			"https://example.com", PackedStringArray(),
-			HTTPClient.METHOD_GET, "", C3HTTPRequest.Options.new()
+			HTTPClient.METHOD_GET, "", C3Http.Options.new()
 		)
 
 
 ## Tests for [method _Stub.fail].
 class TestStubFail extends GutTest:
-	var mock: C3HTTPRequest.Mock
+	var mock: C3Http.Mock
 
 	func before_each() -> void:
-		mock = C3HTTPRequest.Mock.new()
+		mock = C3Http.Mock.new()
 		mock.install()
 
 	func after_each() -> void:
 		mock.uninstall()
 
 	func test_fail_sets_ok_false() -> void:
-		mock.stub().fail(C3HTTPRequest.RequestError.transport("err"))
+		mock.stub().fail(C3Http.RequestError.transport("err"))
 		assert_false(_request().ok)
 
 	func test_fail_passes_error_through() -> void:
-		var error := C3HTTPRequest.RequestError.transport("Connection refused")
+		var error := C3Http.RequestError.transport("Connection refused")
 		mock.stub().fail(error)
 		assert_eq(_request().error, error)
 
 	func test_fail_copies_status_from_error() -> void:
-		var e := C3HTTPRequest.RequestError.new()
-		e.kind = C3HTTPRequest.RequestError.Kind.HTTP
+		var e := C3Http.RequestError.new()
+		e.kind = C3Http.RequestError.Kind.HTTP
 		e.status = 404
 		e.message = "Not Found"
 		mock.stub().fail(e)
 		assert_eq(_request().status, 404)
 
-	func _request() -> C3HTTPRequest.Response:
+	func _request() -> C3Http.Response:
 		return mock.request(
 			"https://example.com", PackedStringArray(),
-			HTTPClient.METHOD_GET, "", C3HTTPRequest.Options.new()
+			HTTPClient.METHOD_GET, "", C3Http.Options.new()
 		)
 
 
 ## Tests for [method _Stub.returns].
 class TestStubReturns extends GutTest:
-	var mock: C3HTTPRequest.Mock
+	var mock: C3Http.Mock
 
 	func before_each() -> void:
-		mock = C3HTTPRequest.Mock.new()
+		mock = C3Http.Mock.new()
 		mock.install()
 
 	func after_each() -> void:
 		mock.uninstall()
 
 	func test_returns_passes_response_through() -> void:
-		var preset := C3HTTPRequest.Response.new()
+		var preset := C3Http.Response.new()
 		preset.ok = true
 		preset.status = 202
 		mock.stub().returns(preset)
 		var res := mock.request(
 			"https://example.com", PackedStringArray(),
-			HTTPClient.METHOD_GET, "", C3HTTPRequest.Options.new()
+			HTTPClient.METHOD_GET, "", C3Http.Options.new()
 		)
 		assert_eq(res, preset)
 		assert_eq(res.status, 202)
@@ -227,10 +227,10 @@ class TestStubReturns extends GutTest:
 
 ## Tests for stub URL matching via [method Mock._find_stub].
 class TestStubMatching extends GutTest:
-	var mock: C3HTTPRequest.Mock
+	var mock: C3Http.Mock
 
 	func before_each() -> void:
-		mock = C3HTTPRequest.Mock.new()
+		mock = C3Http.Mock.new()
 		mock.install()
 
 	func after_each() -> void:
@@ -265,18 +265,18 @@ class TestStubMatching extends GutTest:
 		var res := _request("https://example.com/other")
 		assert_eq(res.status, 0)
 
-	func _request(url: String) -> C3HTTPRequest.Response:
+	func _request(url: String) -> C3Http.Response:
 		return mock.request(
-			url, PackedStringArray(), HTTPClient.METHOD_GET, "", C3HTTPRequest.Options.new()
+			url, PackedStringArray(), HTTPClient.METHOD_GET, "", C3Http.Options.new()
 		)
 
 
-## Integration tests via the static [method C3HTTPRequest.request] entry point.
+## Integration tests via the static [method C3Http.request] entry point.
 class TestMockIntegration extends GutTest:
-	var mock: C3HTTPRequest.Mock
+	var mock: C3Http.Mock
 
 	func before_each() -> void:
-		mock = C3HTTPRequest.Mock.new()
+		mock = C3Http.Mock.new()
 		mock.install()
 		mock.stub().ok({"result": "ok"})
 
@@ -284,17 +284,17 @@ class TestMockIntegration extends GutTest:
 		mock.uninstall()
 
 	func test_installed_mock_intercepts_request() -> void:
-		var res := await C3HTTPRequest.request("https://example.com")
+		var res := await C3Http.request("https://example.com")
 		assert_true(res.ok)
 		assert_eq(res.json["result"], "ok")
 
 	func test_request_call_recorded_in_log() -> void:
-		await C3HTTPRequest.request("https://api.example.com/users")
+		await C3Http.request("https://api.example.com/users")
 		assert_eq(mock.call_count, 1)
 		assert_eq(mock.last_call["url"], "https://api.example.com/users")
 
 	func test_method_mapped_correctly() -> void:
-		await C3HTTPRequest.request(
+		await C3Http.request(
 			"https://example.com",
 			PackedStringArray(),
 			HTTPClient.METHOD_POST

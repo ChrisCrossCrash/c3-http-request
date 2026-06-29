@@ -1,12 +1,12 @@
 extends GutTest
 
 
-## Unit tests for [C3HTTPRequest.Session] pool mechanics. No network is used.
+## Unit tests for [C3Http.Session] pool mechanics. No network is used.
 class TestSessionPool extends GutTest:
-	var session: C3HTTPRequest.Session
+	var session: C3Http.Session
 
 	func before_each() -> void:
-		session = C3HTTPRequest.Session.new()
+		session = C3Http.Session.new()
 
 	# checkout / checkin basics
 
@@ -26,7 +26,7 @@ class TestSessionPool extends GutTest:
 		assert_true(session._pool.has("key"))
 		assert_eq(session._pool["key"].size(), 1)
 		# The exact client object is stored under the key, not a copy.
-		var entry: C3HTTPRequest.Session._PoolEntry = session._pool["key"][0]
+		var entry: C3Http.Session._PoolEntry = session._pool["key"][0]
 		assert_eq(entry.client, client)
 
 	func test_checkin_multiple_same_key() -> void:
@@ -51,14 +51,14 @@ class TestSessionPool extends GutTest:
 		var entries: Array = session._pool["key"]
 		assert_eq(entries.size(), 2)
 		# c1 was oldest (index 0) and must have been evicted; c2 and c3 remain.
-		assert_eq((entries[0] as C3HTTPRequest.Session._PoolEntry).client, c2)
-		assert_eq((entries[1] as C3HTTPRequest.Session._PoolEntry).client, c3)
+		assert_eq((entries[0] as C3Http.Session._PoolEntry).client, c2)
+		assert_eq((entries[1] as C3Http.Session._PoolEntry).client, c3)
 
 	# idle_timeout eviction
 
 	func test_checkout_discards_expired_entry() -> void:
 		session.idle_timeout = 0.001  # 1 ms — will expire almost instantly
-		var entry := C3HTTPRequest.Session._PoolEntry.new()
+		var entry := C3Http.Session._PoolEntry.new()
 		entry.client = HTTPClient.new()
 		entry.checked_in_at_msec = Time.get_ticks_msec() - 100  # 100 ms ago
 		session._pool["key"] = [entry]
@@ -67,7 +67,7 @@ class TestSessionPool extends GutTest:
 
 	func test_checkout_keeps_fresh_entry() -> void:
 		session.idle_timeout = 3600.0  # will not expire
-		var entry := C3HTTPRequest.Session._PoolEntry.new()
+		var entry := C3Http.Session._PoolEntry.new()
 		var client := HTTPClient.new()
 		entry.client = client
 		entry.checked_in_at_msec = Time.get_ticks_msec()
@@ -76,7 +76,7 @@ class TestSessionPool extends GutTest:
 		# time-based path by confirming the entry is NOT discarded due to age.
 		# (It will still be discarded for bad status, which is a separate check.)
 		session._pool["key"] = [entry]
-		var popped: C3HTTPRequest.Session._PoolEntry = session._pool["key"].pop_back()
+		var popped: C3Http.Session._PoolEntry = session._pool["key"].pop_back()
 		var age_ok := (Time.get_ticks_msec() - popped.checked_in_at_msec) / 1000.0 < session.idle_timeout
 		assert_true(age_ok)
 
@@ -96,7 +96,7 @@ class TestSessionPool extends GutTest:
 
 	func test_prune_removes_stale_entries() -> void:
 		session.idle_timeout = 0.001
-		var entry := C3HTTPRequest.Session._PoolEntry.new()
+		var entry := C3Http.Session._PoolEntry.new()
 		entry.client = HTTPClient.new()
 		entry.checked_in_at_msec = Time.get_ticks_msec() - 100
 		session._pool["key"] = [entry]
@@ -105,7 +105,7 @@ class TestSessionPool extends GutTest:
 
 	func test_prune_keeps_fresh_entries() -> void:
 		session.idle_timeout = 3600.0
-		var entry := C3HTTPRequest.Session._PoolEntry.new()
+		var entry := C3Http.Session._PoolEntry.new()
 		entry.client = HTTPClient.new()
 		entry.checked_in_at_msec = Time.get_ticks_msec()
 		session._pool["key"] = [entry]
@@ -115,7 +115,7 @@ class TestSessionPool extends GutTest:
 
 	func test_prune_noop_when_idle_timeout_disabled() -> void:
 		session.idle_timeout = 0.0
-		var entry := C3HTTPRequest.Session._PoolEntry.new()
+		var entry := C3Http.Session._PoolEntry.new()
 		entry.client = HTTPClient.new()
 		entry.checked_in_at_msec = 0  # ancient
 		session._pool["key"] = [entry]
@@ -123,15 +123,15 @@ class TestSessionPool extends GutTest:
 		assert_true(session._pool.has("key"))
 
 
-## Unit tests for [C3HTTPRequest.Session._make_key].
+## Unit tests for [C3Http.Session._make_key].
 class TestMakeKey extends GutTest:
-	var session: C3HTTPRequest.Session
+	var session: C3Http.Session
 
 	func before_each() -> void:
-		session = C3HTTPRequest.Session.new()
+		session = C3Http.Session.new()
 
-	func _opts() -> C3HTTPRequest.Options:
-		return C3HTTPRequest.Options.new()
+	func _opts() -> C3Http.Options:
+		return C3Http.Options.new()
 
 	func test_same_inputs_produce_same_key() -> void:
 		var opts := _opts()
@@ -239,20 +239,20 @@ class TestMakeKey extends GutTest:
 		)
 
 
-## Tests for [C3HTTPRequest.Options] defaults related to session.
+## Tests for [C3Http.Options] defaults related to session.
 class TestOptionsSessionDefault extends GutTest:
 	func test_session_default_is_null() -> void:
-		var opts := C3HTTPRequest.Options.new()
+		var opts := C3Http.Options.new()
 		assert_null(opts.session)
 
 
 ## Tests for honoring a "Connection: close" response header, which gates whether a
 ## connection is returned to the pool after a request completes.
 class TestConnectionCloseHeader extends GutTest:
-	var impl: C3HTTPRequest._Impl
+	var impl: C3Http._Impl
 
 	func before_each() -> void:
-		impl = C3HTTPRequest._Impl.new()
+		impl = C3Http._Impl.new()
 
 	func test_no_connection_header_keeps_alive() -> void:
 		assert_false(impl._connection_close_requested(
@@ -299,10 +299,10 @@ class TestConnectionCloseHeader extends GutTest:
 ## on one Session, gzip and POST over reuse). All passed; see the PR for steps:
 ## https://github.com/ChrisCrossCrash/c3-http-request/pull/6
 class TestRetrySafeMethods extends GutTest:
-	var impl: C3HTTPRequest._Impl
+	var impl: C3Http._Impl
 
 	func before_each() -> void:
-		impl = C3HTTPRequest._Impl.new()
+		impl = C3Http._Impl.new()
 
 	func test_get_is_safe() -> void:
 		assert_true(impl._is_safe_to_retry(HTTPClient.METHOD_GET))

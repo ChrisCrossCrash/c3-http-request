@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Standalone benchmark server for the C3HTTPRequest benchmark.
+"""Standalone benchmark server for the C3Http benchmark.
 
 Serves the same two endpoints as the hosted benchmark API, but with no
 framework and no dependencies — just the Python standard library. Run it on

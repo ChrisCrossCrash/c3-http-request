@@ -8,7 +8,7 @@ class TestSSEParsing extends GutTest:
 	# — U+2014 em-dash — 3 bytes: E2 80 94.
 	const _EM_DASH := "—"
 
-	var impl: C3HTTPRequest._Impl
+	var impl: C3Http._Impl
 	var events: Array = []
 	# Persistent last-event-id / retry buffers, mirroring the boxes request()
 	# threads through the parser across the whole stream.
@@ -16,7 +16,7 @@ class TestSSEParsing extends GutTest:
 	var retry_box: Array = [-1]
 
 	func before_each() -> void:
-		impl = C3HTTPRequest._Impl.new()
+		impl = C3Http._Impl.new()
 		events = []
 		id_box = [""]
 		retry_box = [-1]

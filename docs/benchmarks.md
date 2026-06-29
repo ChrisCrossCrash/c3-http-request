@@ -1,10 +1,10 @@
-# C3HTTPRequest Benchmark
+# C3Http Benchmark
 
-This analysis compares `C3HTTPRequest` against Godot's native [`HTTPRequest`](https://docs.godotengine.org/en/4.7/classes/class_httprequest.html) node across three scenarios: single-request latency, small downloads (TCP slow-start behavior), and large file downloads. The results are from a run of the [`examples/benchmark/benchmark.gd`](../examples/benchmark/benchmark.gd) script, which generated the results in [`BENCHMARK.md`](../BENCHMARK.md).
+This analysis compares `C3Http` against Godot's [`HTTPRequest`](https://docs.godotengine.org/en/4.7/classes/class_httprequest.html) node across three scenarios: single-request latency, small downloads (TCP slow-start behavior), and large file downloads. The results are from a run of the [`examples/benchmark/benchmark.gd`](https://github.com/ChrisCrossCrash/c3-http-request/blob/main/examples/benchmark/benchmark.gd) script, which generated the results in [`BENCHMARK.md`](https://github.com/ChrisCrossCrash/c3-http-request/blob/main/BENCHMARK.md).
 
 Both clients are built on the same transport: Godot's [`HTTPClient`](https://docs.godotengine.org/en/4.7/classes/class_httpclient.html), a non-blocking state machine you drive by calling `poll()` repeatedly to advance it through its stages — resolving the host, connecting, sending the request, then reading the response body one chunk at a time. Neither client blocks a thread waiting on the network; instead each runs a **polling loop** that calls `poll()` over and over until the response is complete. One of the important design consideration regarding speed for each client is _how often, and on which thread, that loop gets to run._
 
-Each scenario tests two polling modes. In **cooperative** mode (the default for both clients), the polling loop yields back to the scene tree whenever it has to wait, resuming on the next frame — so the frame rate bounds how often it can resume to make progress. How much work each client does within a single resume varies, and that is exactly where the two differ on downloads, below. This cadence ties timing to the frame rate throughout, so the latency scenario varies the frame cap directly (uncapped, 120, 60, and 30 fps) to isolate its effect. In **threaded** mode, the request runs on a background thread that polls at OS speed, decoupling it from the frame rate entirely. Each client opts in through its own setting: `Options.use_threads = true` for C3HTTPRequest, and the native node's own `use_threads` property for `HTTPRequest`. The tables below report both modes for each client side by side. Every section also includes a C3HTTPRequest "session" variant that passes a shared `Session` object via `Options.session`, reusing the existing TLS/TCP connection across requests instead of opening a new one each time.
+Each scenario tests two polling modes. In **cooperative** mode (the default for both clients), the polling loop yields back to the scene tree whenever it has to wait, resuming on the next frame — so the frame rate bounds how often it can resume to make progress. How much work each client does within a single resume varies, and that is exactly where the two differ on downloads, below. This cadence ties timing to the frame rate throughout, so the latency scenario varies the frame cap directly (uncapped, 120, 60, and 30 fps) to isolate its effect. In **threaded** mode, the request runs on a background thread that polls at OS speed, decoupling it from the frame rate entirely. Each client opts in through its own setting: `Options.use_threads = true` for `C3Http`, and `HTTPRequest`'s own `use_threads` property. The tables below report both modes for each client side by side. Every section also includes a `C3Http` "session" variant that passes a shared `Session` object via `Options.session`, reusing the existing TLS/TCP connection across requests instead of opening a new one each time.
 
 **Test environment:**
 
@@ -19,18 +19,18 @@ Each scenario tests two polling modes. In **cooperative** mode (the default for 
 | Run command      | `godot --path . --no-debug examples/benchmark/benchmark.tscn`                                                                                                                                                               |
 
 > [!NOTE]
-> To prevent abuse, the server requires an API key for all requests. However, a [Python script](../examples/benchmark/benchmark_server.py) is included, which will run a benchmark-compatible server locally on your own machine. To use it, change the `SERVER_BASE` constant in [`benchmark.gd`](../examples/benchmark/benchmark.gd) to point to `http://127.0.0.1:8927`, then run the Python script in a separate terminal before running the benchmark. The results will differ significantly from the published numbers due to the local connection, but the relative performance of the clients should be similar.
+> To prevent abuse, the server requires an API key for all requests. However, a [Python script](https://github.com/ChrisCrossCrash/c3-http-request/blob/main/examples/benchmark/benchmark_server.py) is included, which will run a benchmark-compatible server locally on your own machine. To use it, change the `SERVER_BASE` constant in [`benchmark.gd`](https://github.com/ChrisCrossCrash/c3-http-request/blob/main/examples/benchmark/benchmark.gd) to point to `http://127.0.0.1:8927`, then run the Python script in a separate terminal before running the benchmark. The results will differ significantly from the published numbers due to the local connection, but the relative performance of the clients should be similar.
 
 All results are medians, so a request occasionally slowed by system noise doesn't skew the numbers. The client machine was in Minneapolis, MN; the server in Virginia (AWS us-east-1), roughly 1,300 miles away. All timing values are in milliseconds. The following table defines the labels used in the results tables below.
 
-| ID       | Description                                              |
-| -------- | -------------------------------------------------------- |
-| nat_coop | native HTTPRequest node, cooperative (default) polling   |
-| c3_coop  | C3HTTPRequest, cooperative (default) polling             |
-| c3s_coop | C3HTTPRequest, cooperative polling, session (keep-alive) |
-| nat_thr  | native HTTPRequest node, threaded polling                |
-| c3_thr   | C3HTTPRequest, threaded polling                          |
-| c3s_thr  | C3HTTPRequest, threaded polling, session (keep-alive)    |
+| ID       | Description                                         |
+| -------- | --------------------------------------------------- |
+| nat_coop | Native `HTTPRequest`, cooperative (default) polling |
+| c3_coop  | `C3Http`, cooperative (default) polling             |
+| c3s_coop | `C3Http`, cooperative polling, session (keep-alive) |
+| nat_thr  | Native `HTTPRequest`, threaded polling              |
+| c3_thr   | `C3Http`, threaded polling                          |
+| c3s_thr  | `C3Http`, threaded polling, session (keep-alive)    |
 
 ---
 
@@ -55,13 +55,13 @@ All results are medians, so a request occasionally slowed by system noise doesn'
 
 **Threaded mode is nearly flat across frame caps.** Both clients sit at ~162–166 ms uncapped and ~166.5 ms at every capped rate — they do _not_ climb with the frame cap the way cooperative mode does (compare native cooperative's 183 → 200 → 233 ms). The request runs on a background thread that completes the whole connection (resolve, connect, send, receive) in one shot at network speed, ~162 ms. The only frame-dependent cost left is delivery: the finished result is handed back to the awaiting main-thread coroutine on the next `process_frame`, so the measured time is the true network time rounded _up_ to the next frame boundary — at most one frame of overhead. That all three capped rates land on the same ~166.5 ms is a coincidence of the caps chosen: ~162 ms rounds up to 20 frames at 120 fps, 10 frames at 60 fps, and 5 frames at 30 fps, and all three products fall at ~166.7 ms. Unlike cooperative mode, threaded mode never accumulates per-frame polling latency, so it stays flat instead of rising as the cap drops.
 
-**In cooperative mode, C3HTTPRequest resolves ~1 frame sooner than native.** The difference between C3 and native at each capped rate matches almost exactly one additional frame period:
+**In cooperative mode, `C3Http` resolves ~1 frame sooner than native.** The difference between `C3Http` and `HTTPRequest` at each capped rate matches almost exactly one additional frame period:
 
-- 120 fps (8.3 ms/frame): native is 8.4 ms slower than C3 — one frame
-- 60 fps (16.7 ms/frame): native is 16.7 ms slower than C3 — one frame
-- 30 fps (33.3 ms/frame): native is 33.4 ms slower than C3 — one frame
+- 120 fps (8.3 ms/frame): `HTTPRequest` is 8.4 ms slower than `C3Http` — one frame
+- 60 fps (16.7 ms/frame): `HTTPRequest` is 16.7 ms slower than `C3Http` — one frame
+- 30 fps (33.3 ms/frame): `HTTPRequest` is 33.4 ms slower than `C3Http` — one frame
 
-The native node burns one extra frame per request, regardless of frame rate, because of how its polling loop is structured. `HTTPRequest` runs one iteration of a `switch (client->get_status())` per frame, in [`scene/main/http_request.cpp`](https://github.com/godotengine/godot/blob/4.7-stable/scene/main/http_request.cpp#L415-L420). When `client->poll()` advances the status, that transition isn't acted on until the _next_ frame, when the switch is evaluated again. The `STATUS_REQUESTING` case shows it:
+`HTTPRequest` burns one extra frame per request, regardless of frame rate, because of how its polling loop is structured. `HTTPRequest` runs one iteration of a `switch (client->get_status())` per frame, in [`scene/main/http_request.cpp`](https://github.com/godotengine/godot/blob/4.7-stable/scene/main/http_request.cpp#L415-L420). When `client->poll()` advances the status, that transition isn't acted on until the _next_ frame, when the switch is evaluated again. The `STATUS_REQUESTING` case shows it:
 
 ```cpp
 case HTTPClient::STATUS_REQUESTING: {
@@ -72,7 +72,7 @@ case HTTPClient::STATUS_REQUESTING: {
 
 On the frame the headers arrive, `poll()` moves the client to `STATUS_BODY`, but the switch has already committed to the `STATUS_REQUESTING` branch, so it returns and waits. Only on the following frame does the switch re-read the status, fall into the `STATUS_BODY` case, and read the response. The status was updated one frame before it was checked.
 
-C3HTTPRequest re-reads the status in the same loop iteration, right after polling, and proceeds without yielding the moment the request phase ends:
+`C3Http` re-reads the status in the same loop iteration, right after polling, and proceeds without yielding the moment the request phase ends:
 
 ```gdscript
 while true:
@@ -83,9 +83,9 @@ while true:
     await _pump(tree, _on_worker)
 ```
 
-So a status transition that costs native a frame costs C3 nothing. This is the same mechanism at every status boundary; the `STATUS_REQUESTING` → `STATUS_BODY` transition is the one that lands inside the measured window. At a capped frame rate, `Options.use_threads = true` eliminates this overhead for both clients.
+So a status transition that costs native a frame costs `C3Http` nothing. This is the same mechanism at every status boundary; the `STATUS_REQUESTING` → `STATUS_BODY` transition is the one that lands inside the measured window. At a capped frame rate, `Options.use_threads = true` eliminates this overhead for both clients.
 
-**C3 (session) eliminates connection-establishment overhead entirely.** When `Options.session` is set to a shared `Session` object, C3HTTPRequest reuses the existing TLS/TCP connection instead of opening a new one. The warmup requests pre-fill the session's connection pool so each timed call finds a ready connection. Measured times drop to 33–67 ms across frame caps — compared to 162–233 ms without a session — eliminating roughly 125 ms of TCP and TLS handshake overhead per request. Session latency still grows with lower frame caps (the main-thread coroutine still waits on `process_frame`), but the absolute numbers are so small that even at 30 fps the time is under 70 ms. Cooperative and threaded are within 2 ms of each other at every cap, since the connection-setup time that threading could overlap is already gone.
+**`C3Http` (session) eliminates connection-establishment overhead entirely.** When `Options.session` is set to a shared `Session` object, `C3Http` reuses the existing TLS/TCP connection instead of opening a new one. The warmup requests pre-fill the session's connection pool so each timed call finds a ready connection. Measured times drop to 33–67 ms across frame caps — compared to 162–233 ms without a session — eliminating roughly 125 ms of TCP and TLS handshake overhead per request. Session latency still grows with lower frame caps (the main-thread coroutine still waits on `process_frame`), but the absolute numbers are so small that even at 30 fps the time is under 70 ms. Cooperative and threaded are within 2 ms of each other at every cap, since the connection-setup time that threading could overlap is already gone.
 
 ---
 
@@ -116,7 +116,7 @@ Download a body of the stated size, median of 25 runs per variant, at 60 fps. A 
 
 ### Analysis
 
-**10 KB fits in one window, but a body adds one frame in threaded mode.** At 10 KB the fresh-connection cooperative times match the single-request latency baseline — C3 cooperative 183 ms (vs. 183 ms for an empty ping at 60 fps), native 200 ms. The whole body arrives in the first congestion window, in a single round trip, so there is nothing to pay beyond the handshake and one RTT. Threaded mode tells a slightly different story: both clients land at ~183 ms rather than the ~166.5 ms threaded baseline from the latency section — one extra frame at 60 fps. Reading the 10 KB body on the background thread adds a small amount of CPU time that, for this particular network latency and frame rate, is enough to push the thread's completion past a frame boundary, delaying delivery by one `process_frame`. The spread revealed in the five-number summaries in [BENCHMARK.md](../BENCHMARK.md#small-download-slow-start-control-vs-straddled-iw10) confirms this is a borderline boundary effect rather than a fixed cost: the fastest threaded runs dip to ~166 ms (min 166.4 ms for C3, 166.5 ms for native), one frame below the 183 ms median — on those runs the read finished just early enough to make the earlier frame.
+**10 KB fits in one window, but a body adds one frame in threaded mode.** At 10 KB the fresh-connection cooperative times match the single-request latency baseline — C3 cooperative 183 ms (vs. 183 ms for an empty ping at 60 fps), native 200 ms. The whole body arrives in the first congestion window, in a single round trip, so there is nothing to pay beyond the handshake and one RTT. Threaded mode tells a slightly different story: both clients land at ~183 ms rather than the ~166.5 ms threaded baseline from the latency section — one extra frame at 60 fps. Reading the 10 KB body on the background thread adds a small amount of CPU time that, for this particular network latency and frame rate, is enough to push the thread's completion past a frame boundary, delaying delivery by one `process_frame`. The spread revealed in the five-number summaries in [BENCHMARK.md](https://github.com/ChrisCrossCrash/c3-http-request/blob/main/BENCHMARK.md#small-download-slow-start-control-vs-straddled-iw10) confirms this is a borderline boundary effect rather than a fixed cost: the fastest threaded runs dip to ~166 ms (min 166.4 ms for C3, 166.5 ms for native), one frame below the 183 ms median — on those runs the read finished just early enough to make the earlier frame.
 
 **20 KB crosses IW10, so a fresh connection pays an extra round trip.** Bumping the body just past ~14.6 KB forces the server to stop after the first window and wait for an ACK before sending the rest. On fresh connections that extra round trip shows up as one or two added frames — C3 cooperative rises 183 → 200 ms, native stays at 200 ms (it was already a frame behind), and threaded jumps 183 → 200 ms. **The warm session does not move at all: 50 ms at both 10 KB and 20 KB.** Its window is already far larger than 20 KB, so the entire body still goes out in one round trip. This is the crux of the scenario — the slow-start penalty is a property of _fresh_ connections, and a `Session` erases it.
 
@@ -167,7 +167,7 @@ In cooperative mode `_update_connection()` runs once per frame (driven by `NOTIF
 
 The slowness was first reported in 2019 as [godot#32807](https://github.com/godotengine/godot/issues/32807), but note that the issue documents the _symptom_ (slow downloads), not this mechanism. The maintainers attributed it to the small default `read_chunk_size` and resolved the issue by exposing `download_chunk_size` as a tunable, later raising its default to 64 KiB. That lifts the ceiling but does not remove the one-chunk-per-frame gate — which is the deeper cause, and which the verbatim source above shows is still present in 4.7-stable. (The per-frame structure was correctly identified by a commenter in that thread, but it was never the basis of the fix.) So the claim here rests on the engine source, not on the observed behavior. The one-chunk-per-frame gate was identified while building C3 HTTP Request and filed as [godot#120425](https://github.com/godotengine/godot/issues/120425); at the time of writing a fix PR is pending approval.
 
-**C3HTTPRequest drains all available chunks per frame in cooperative mode.** It reads everything the connection delivers each frame, so its time tracks bandwidth rather than polling cadence — nearly 5× faster than native at 60 fps for an 8 MB body (487 ms vs. 2367 ms), and nearly 9× faster at 32 MB (984 ms vs. 8800 ms). The advantage already shows at 1 MB (334 ms vs. 500 ms): a 1 MB body is ~16 chunks, which at one chunk per frame is ~16 frames of gating that C3 collapses into far fewer. The two clients converge only once a body fits in a frame or two of chunks.
+**`C3Http` drains all available chunks per frame in cooperative mode.** It reads everything the connection delivers each frame, so its time tracks bandwidth rather than polling cadence — nearly 5× faster than native at 60 fps for an 8 MB body (487 ms vs. 2367 ms), and nearly 9× faster at 32 MB (984 ms vs. 8800 ms). The advantage already shows at 1 MB (334 ms vs. 500 ms): a 1 MB body is ~16 chunks, which at one chunk per frame is ~16 frames of gating that C3 collapses into far fewer. The two clients converge only once a body fits in a frame or two of chunks.
 
 **Threaded mode narrows the gap but does not fully close it.** With `use_threads = true`, both clients poll at OS speed. At 8 MB, C3 threaded (466 ms) and native threaded (550 ms) are within ~84 ms — compared to the ~1,880 ms cooperative gap — but they do not converge. At 32 MB the threaded gap widens to ~386 ms (948 ms vs. 1,335 ms). C3's drain-all-chunks behavior retains a throughput advantage even without the per-frame gate.
 
@@ -183,7 +183,7 @@ The advantage narrows as body size grows because the actual transfer time increa
 
 ## Summary
 
-| Scenario                     | C3HTTPRequest (session)                    | C3HTTPRequest                        | native HTTPRequest                   |
+| Scenario                     | `C3Http` (session)                         | `C3Http`                             | `HTTPRequest`                        |
 | ---------------------------- | ------------------------------------------ | ------------------------------------ | ------------------------------------ |
 | Latency (cooperative)        | ~4–5× lower; eliminates handshake overhead | ~1 frame sooner at any capped rate   | baseline                             |
 | Latency (threaded)           | ~35–67 ms                                  | flat ~166 ms; does not rise with cap | flat ~166 ms; does not rise with cap |
@@ -194,4 +194,4 @@ The advantage narrows as body size grows because the actual transfer time increa
 | 32 MB download (cooperative) | ~535 ms                                    | ~9× faster than native               | frame-rate-gated throughput ceiling  |
 | 32 MB download (threaded)    | ~562 ms                                    | ~386 ms faster than native           | baseline                             |
 
-For minimum latency, `Options.session` with a shared `Session` object is the strongest lever — it eliminates handshake and TCP slow-start overhead entirely, cutting round-trip time by ~125 ms per request when the connection is already established. The session advantage holds at every transfer size tested, though it narrows as body size grows and raw throughput dominates over connection-setup time. For large cooperative downloads, C3HTTPRequest is the only option that doesn't hit the per-frame chunk ceiling; `Options.use_threads = true` substantially closes the gap for native `HTTPRequest`, but C3 retains a throughput edge even in threaded mode at larger body sizes.
+For minimum latency, `Options.session` with a shared `Session` object is the strongest lever — it eliminates handshake and TCP slow-start overhead entirely, cutting round-trip time by ~125 ms per request when the connection is already established. The session advantage holds at every transfer size tested, though it narrows as body size grows and raw throughput dominates over connection-setup time. For large cooperative downloads, `C3Http` is the only option that doesn't hit the per-frame chunk ceiling; `Options.use_threads = true` substantially closes the gap for `HTTPRequest`, but `C3Http` retains a throughput edge even in threaded mode at larger body sizes.

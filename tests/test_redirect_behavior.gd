@@ -224,7 +224,7 @@ class _SameOriginRedirectServer:
 # Records every distinct start_ms value passed to _timed_out(). After a redirected
 # request, distinct_start_ms_count() == 1 means all hops shared one clock origin
 # (correct); > 1 means each hop reset its own clock (the bug).
-class _StartMsCapturingImpl extends C3HTTPRequest._Impl:
+class _StartMsCapturingImpl extends C3Http._Impl:
 	var _seen: Array[int] = []
 
 	func _timed_out(start_ms: int, timeout: float) -> bool:
@@ -239,7 +239,7 @@ class _StartMsCapturingImpl extends C3HTTPRequest._Impl:
 # Runs the first request() call normally but returns a transport error for every
 # subsequent call (i.e. redirect follow-up hops). Simulates a connection failure
 # on the redirected URL without needing an actual unroutable target.
-class _FailOnSecondHopImpl extends C3HTTPRequest._Impl:
+class _FailOnSecondHopImpl extends C3Http._Impl:
 	var _hop := 0
 
 	func request(
@@ -247,16 +247,16 @@ class _FailOnSecondHopImpl extends C3HTTPRequest._Impl:
 		custom_headers: PackedStringArray,
 		method: int,
 		request_data: Variant,
-		options: C3HTTPRequest.Options,
+		options: C3Http.Options,
 		_redirects_left: int = -1,
 		_on_worker: bool = false,
 		_start_ms: int = -1,
 		_force_fresh: bool = false
-	) -> C3HTTPRequest.Response:
+	) -> C3Http.Response:
 		_hop += 1
 		if _hop > 1:
 			return _fail(
-				C3HTTPRequest.RequestError.transport(
+				C3Http.RequestError.transport(
 					"Simulated connection failure on redirect target."
 				)
 			)
@@ -286,8 +286,8 @@ class TestRedirectCrossOriginHeaders extends GutTest:
 		var redir_port := _redirect_server.start("http://127.0.0.1:%d/" % rec_port)
 		assert_ne(redir_port, 0, "redirect server failed to bind")
 
-		var res: C3HTTPRequest.Response = await (
-			C3HTTPRequest
+		var res: C3Http.Response = await (
+			C3Http
 			._Impl
 			.new()
 			.request(
@@ -295,7 +295,7 @@ class TestRedirectCrossOriginHeaders extends GutTest:
 				PackedStringArray(["Authorization: Bearer secret"]),
 				HTTPClient.METHOD_GET,
 				"",
-				C3HTTPRequest.Options.new()
+				C3Http.Options.new()
 			)
 		)
 
@@ -313,7 +313,7 @@ class TestRedirectCrossOriginHeaders extends GutTest:
 		assert_ne(redir_port, 0, "redirect server failed to bind")
 
 		await (
-			C3HTTPRequest
+			C3Http
 			._Impl
 			.new()
 			.request(
@@ -321,7 +321,7 @@ class TestRedirectCrossOriginHeaders extends GutTest:
 				PackedStringArray(["X-Custom: my-value"]),
 				HTTPClient.METHOD_GET,
 				"",
-				C3HTTPRequest.Options.new()
+				C3Http.Options.new()
 			)
 		)
 
@@ -348,7 +348,7 @@ class TestRedirectSameOriginHeaders extends GutTest:
 		assert_ne(p, 0, "server failed to bind")
 
 		await (
-			C3HTTPRequest
+			C3Http
 			._Impl
 			.new()
 			.request(
@@ -356,7 +356,7 @@ class TestRedirectSameOriginHeaders extends GutTest:
 				PackedStringArray(["Authorization: Bearer secret"]),
 				HTTPClient.METHOD_GET,
 				"",
-				C3HTTPRequest.Options.new()
+				C3Http.Options.new()
 			)
 		)
 
@@ -387,7 +387,7 @@ class TestRedirectTimeoutClock extends GutTest:
 		assert_ne(p, 0, "server failed to bind")
 
 		var impl := _StartMsCapturingImpl.new()
-		var opts := C3HTTPRequest.Options.new()
+		var opts := C3Http.Options.new()
 		opts.timeout = 5.0
 
 		await impl.request(
@@ -433,10 +433,10 @@ class TestRedirectDownloadFileCleanup extends GutTest:
 		assert_ne(redir_port, 0, "redirect server failed to bind")
 
 		var impl := _FailOnSecondHopImpl.new()
-		var opts := C3HTTPRequest.Options.new()
+		var opts := C3Http.Options.new()
 		opts.download_file = _DOWNLOAD_PATH
 
-		var res: C3HTTPRequest.Response = await impl.request(
+		var res: C3Http.Response = await impl.request(
 			"http://127.0.0.1:%d/" % redir_port,
 			PackedStringArray(),
 			HTTPClient.METHOD_GET,

@@ -1,13 +1,13 @@
 # Connection Status
 
-Set `Options.on_status_changed` to a `Callable` to observe the underlying `HTTPClient` as it advances through its lifecycle — the equivalent of polling the native node's `get_http_client_status()`. The callback fires once per change, `on_status_changed.call(status)`, where `status` is an `HTTPClient.Status` value.
+Set `Options.on_status_changed` to a `Callable` to observe the underlying `HTTPClient` as it advances through its lifecycle — the equivalent of `HTTPRequest`'s `get_http_client_status()`. The callback fires once per change, `on_status_changed.call(status)`, where `status` is an `HTTPClient.Status` value.
 
 ```gdscript
-var opts := C3HTTPRequest.Options.new()
+var opts := C3Http.Options.new()
 opts.on_status_changed = func(status: HTTPClient.Status) -> void:
     print(status)  # HTTPClient.STATUS_CONNECTING, STATUS_REQUESTING, STATUS_BODY, ...
 
-var res := await C3HTTPRequest.request("https://example.com", PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
+var res := await C3Http.request("https://example.com", PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
 ```
 
 A typical request reports `STATUS_RESOLVING`/`STATUS_CONNECTING` → `STATUS_CONNECTED` → `STATUS_REQUESTING` → `STATUS_BODY`.

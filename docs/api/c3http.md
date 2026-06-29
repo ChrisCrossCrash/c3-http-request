@@ -1,4 +1,4 @@
-# C3HTTPRequest
+# C3Http
 
 **Inherits:** [`RefCounted`](https://docs.godotengine.org/en/stable/classes/class_refcounted.html#class-refcounted)
 

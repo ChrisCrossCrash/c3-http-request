@@ -3,10 +3,10 @@ extends GutTest
 
 ## Tests for request header assembly ([method _Impl._build_request_headers]).
 class TestBuildRequestHeaders extends GutTest:
-	var impl: C3HTTPRequest._Impl
+	var impl: C3Http._Impl
 
 	func before_each() -> void:
-		impl = C3HTTPRequest._Impl.new()
+		impl = C3Http._Impl.new()
 
 	func test_adds_accept_encoding_when_enabled() -> void:
 		var headers := impl._build_request_headers(
@@ -55,10 +55,10 @@ class TestBuildRequestHeaders extends GutTest:
 
 ## Unit tests for the internal header-value lookup ([method _Impl._header_value]).
 class TestHeaderValue extends GutTest:
-	var impl: C3HTTPRequest._Impl
+	var impl: C3Http._Impl
 
 	func before_each() -> void:
-		impl = C3HTTPRequest._Impl.new()
+		impl = C3Http._Impl.new()
 
 	func test_finds_value_with_space() -> void:
 		var headers := PackedStringArray(["Accept-Encoding: gzip"])

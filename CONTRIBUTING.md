@@ -80,7 +80,7 @@ Awaiting a **signal** also requires an explicit type — GDScript cannot infer t
 var data: SomeClass.SomeType = await some_node.some_signal
 
 # Function await — := works
-var result := await C3HTTPRequest.request("https://api.example.com/")
+var result := await C3Http.request("https://api.example.com/")
 ```
 
 ### Comments

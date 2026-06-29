@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-C3 HTTP Request for Godot is a Godot 4 addon providing a static, async HTTP client that requires no scene tree. Callers `await C3HTTPRequest.request(...)` and check `response.ok` — a single check that covers transport failures, timeouts, and non-2xx statuses alike. The implementation uses `HTTPClient` (a `RefCounted`) with a cooperative polling loop, so it works from any script context without adding a `Node`.
+C3 HTTP Request for Godot is a Godot 4 addon providing a static, async HTTP client that requires no scene tree. Callers `await C3Http.request(...)` and check `response.ok` — a single check that covers transport failures, timeouts, and non-2xx statuses alike. The implementation uses `HTTPClient` (a `RefCounted`) with a cooperative polling loop, so it works from any script context without adding a `Node`.
 
 ## Commands
 
@@ -34,20 +34,20 @@ python scripts/build_asset.py <version>
 
 ```
 godot --headless --path . --doctool docs/xml --gdscript-docs res://c3_http_request/
-python scripts/generate_api_docs.py --outer-class C3HTTPRequest
+python scripts/generate_api_docs.py --outer-class C3Http
 ```
 
 ## Architecture
 
 The addon is a single script: [c3_http_request/c3_http_request.gd](c3_http_request/c3_http_request.gd).
 
-**`C3HTTPRequest`** — No `extends`, no `@tool`. Public surface:
+**`C3Http`** — No `extends`, no `@tool`. Public surface:
 
 - `static func request(url, custom_headers, method, request_data, options)` → `Response` — async entry point for string bodies. Delegates to `_impl.request()`.
 - `static func request_raw(url, custom_headers, method, request_data_raw, options)` → `Response` — same as `request` but accepts a `PackedByteArray` body; defaults to `METHOD_POST`.
 - `static var _impl: _Impl` — swapped in tests via `Mock.install()` / `Mock.uninstall()` to intercept calls without touching the network.
 
-HTTP methods use Godot's native `HTTPClient.Method` enum (e.g. `HTTPClient.METHOD_GET`) directly, mirroring the native `HTTPRequest` node — there is no addon-specific method enum.
+HTTP methods use Godot's native `HTTPClient.Method` enum (e.g. `HTTPClient.METHOD_GET`) directly, mirroring `HTTPRequest` — there is no addon-specific method enum.
 
 **Inner classes:**
 

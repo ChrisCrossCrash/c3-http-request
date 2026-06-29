@@ -13,7 +13,7 @@ godot --headless --path . --doctool docs/xml --gdscript-docs res://c3_http_reque
 **Step 2** — convert the XML to Markdown:
 
 ```
-python scripts/generate_api_docs.py --outer-class C3HTTPRequest
+python scripts/generate_api_docs.py --outer-class C3Http
 ```
 
 **Step 3** — verify the site builds without errors:

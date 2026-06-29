@@ -4,10 +4,10 @@ extends GutTest
 ## Tests for the streaming download decompressor
 ## ([method _Impl._decode_chunk] / [method _Impl._drain_decoder]).
 class TestStreamingDecompression extends GutTest:
-	var impl: C3HTTPRequest._Impl
+	var impl: C3Http._Impl
 
 	func before_each() -> void:
-		impl = C3HTTPRequest._Impl.new()
+		impl = C3Http._Impl.new()
 
 	# Decodes [param compressed] by feeding it through _decode_chunk in slices of
 	# [param piece] bytes — mirroring the body loop's per-chunk decode. Each chunk
@@ -54,7 +54,7 @@ class TestStreamingDecompression extends GutTest:
 
 	func test_decode_large_body_round_trips() -> void:
 		# A body well past a single buffer, to exercise multi-slice draining.
-		var text := "C3HTTPRequest streaming gzip. ".repeat(2000)
+		var text := "C3Http streaming gzip. ".repeat(2000)
 		var original := text.to_utf8_buffer()
 		var compressed := original.compress(FileAccess.COMPRESSION_GZIP)
 		var result := _decode_in_pieces(compressed, 512)
@@ -95,10 +95,10 @@ class TestStreamingDecompression extends GutTest:
 ## Tests for the download decompressor factory
 ## ([method _Impl._make_download_decoder]).
 class TestMakeDownloadDecoder extends GutTest:
-	var impl: C3HTTPRequest._Impl
+	var impl: C3Http._Impl
 
 	func before_each() -> void:
-		impl = C3HTTPRequest._Impl.new()
+		impl = C3Http._Impl.new()
 
 	func test_null_when_accept_gzip_false() -> void:
 		# Regression guard: an opted-out caller must never get a decoder, even for a
@@ -126,10 +126,10 @@ class TestMakeDownloadDecoder extends GutTest:
 
 ## Tests for in-memory body decompression ([method _Impl._maybe_decompress_body]).
 class TestMaybeDecompressBody extends GutTest:
-	var impl: C3HTTPRequest._Impl
+	var impl: C3Http._Impl
 
 	func before_each() -> void:
-		impl = C3HTTPRequest._Impl.new()
+		impl = C3Http._Impl.new()
 
 	func test_decompresses_gzip_when_enabled() -> void:
 		var original := "Decoded in-memory body.".to_utf8_buffer()
@@ -195,7 +195,7 @@ class TestMaybeDecompressBody extends GutTest:
 			_empty_content_gzip(), headers, true, 1024
 		)
 		assert_false(
-			result is C3HTTPRequest.RequestError, "empty body must not error"
+			result is C3Http.RequestError, "empty body must not error"
 		)
 		assert_eq(result, PackedByteArray())
 
@@ -232,10 +232,10 @@ class TestMaybeDecompressBody extends GutTest:
 		var result: Variant = impl._maybe_decompress_body(
 			compressed, headers, true, 1024
 		)
-		assert_is(result, C3HTTPRequest.RequestError)
+		assert_is(result, C3Http.RequestError)
 		assert_eq(
-			(result as C3HTTPRequest.RequestError).kind,
-			C3HTTPRequest.RequestError.Kind.BODY_SIZE_LIMIT_EXCEEDED
+			(result as C3Http.RequestError).kind,
+			C3Http.RequestError.Kind.BODY_SIZE_LIMIT_EXCEEDED
 		)
 
 	func test_corrupt_gzip_body_fails() -> void:
@@ -249,10 +249,10 @@ class TestMaybeDecompressBody extends GutTest:
 		var result: Variant = impl._maybe_decompress_body(
 			garbage, headers, true, -1
 		)
-		assert_is(result, C3HTTPRequest.RequestError)
+		assert_is(result, C3Http.RequestError)
 		assert_eq(
-			(result as C3HTTPRequest.RequestError).kind,
-			C3HTTPRequest.RequestError.Kind.TRANSPORT
+			(result as C3Http.RequestError).kind,
+			C3Http.RequestError.Kind.TRANSPORT
 		)
 		# StreamPeerGZIP logs an engine error on malformed input; assert it so GUT
 		# treats the expected log as handled rather than an unexpected failure.

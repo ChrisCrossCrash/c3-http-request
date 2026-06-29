@@ -1,12 +1,12 @@
 # Testing
 
-`C3HTTPRequest`'s built-in `Mock` class makes testing with [GUT](https://github.com/bitwes/Gut) easy. `C3HTTPRequest.Mock` lets you test code that calls `C3HTTPRequest.request()` without touching the network. Install it in `before_each` and uninstall in `after_each` — every `await C3HTTPRequest.request(...)` in your code is intercepted for the duration:
+`C3Http`'s built-in `Mock` class makes testing with [GUT](https://github.com/bitwes/Gut) easy. `C3Http.Mock` lets you test code that calls `C3Http.request()` without touching the network. Install it in `before_each` and uninstall in `after_each` — every `await C3Http.request(...)` in your code is intercepted for the duration:
 
 ```gdscript
-var mock: C3HTTPRequest.Mock
+var mock: C3Http.Mock
 
 func before_each() -> void:
-    mock = C3HTTPRequest.Mock.new()
+    mock = C3Http.Mock.new()
     mock.install()
 
 func after_each() -> void:
@@ -26,7 +26,7 @@ mock.stub("https://api.example.com/posts").ok({}, 201)
 
 # Specific endpoint → transport failure
 mock.stub("https://api.example.com/broken").fail(
-    C3HTTPRequest.RequestError.transport("Connection refused")
+    C3Http.RequestError.transport("Connection refused")
 )
 ```
 
@@ -38,7 +38,7 @@ When multiple stubs are registered, an exact-URL match takes priority over a wil
 
 ## Asserting calls
 
-Every `C3HTTPRequest.request()` call is appended to `mock.calls`. Each entry is a `Dictionary` with keys `"url"`, `"method"`, `"headers"`, `"body"`, and `"options"`:
+Every `C3Http.request()` call is appended to `mock.calls`. Each entry is a `Dictionary` with keys `"url"`, `"method"`, `"headers"`, `"body"`, and `"options"`:
 
 ```gdscript
 assert_eq(mock.call_count, 1)

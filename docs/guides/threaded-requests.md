@@ -1,12 +1,12 @@
 # Threaded Requests
 
-By default the polling loop yields to the scene tree whenever it has to wait, so it resumes at most once per frame — the same cadence as the native `HTTPRequest` node. Set `Options.use_threads` to `true` to run the loop on a dedicated background thread that polls at OS speed instead, lowering latency for fast endpoints and keeping the main thread free during large or streaming downloads.
+By default the polling loop yields to the scene tree whenever it has to wait, so it resumes at most once per frame — the same cadence as `HTTPRequest`. Set `Options.use_threads` to `true` to run the loop on a dedicated background thread that polls at OS speed instead, lowering latency for fast endpoints and keeping the main thread free during large or streaming downloads.
 
 ```gdscript
-var opts := C3HTTPRequest.Options.new()
+var opts := C3Http.Options.new()
 opts.use_threads = true
 
-var res := await C3HTTPRequest.request("https://example.com/large-file", PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
+var res := await C3Http.request("https://example.com/large-file", PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
 ```
 
 ## Notes

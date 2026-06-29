@@ -1,4 +1,4 @@
-class_name C3HTTPRequest
+class_name C3Http
 ## General-purpose async HTTP client that requires no scene tree.
 ##
 ## Call the static [method request] from anywhere — no [Node] to add or
@@ -14,8 +14,8 @@ static var _impl: _Impl = _Impl.new()
 
 func _init() -> void:
 	push_warning(
-		"C3HTTPRequest is not meant to be instantiated like Godot's native "
-		+ "HTTPRequest. Call C3HTTPRequest.request() directly."
+		"C3Http is not meant to be instantiated like Godot's native "
+		+ "HTTPRequest. Call C3Http.request() directly."
 	)
 
 
@@ -78,7 +78,7 @@ class Options:
 	## the decompressor straight to disk, so the file holds the decoded content.
 	## [br][br]
 	## When [code]false[/code], no [code]Accept-Encoding[/code] header is sent and
-	## no decompression is performed (matching native [HTTPRequest]). Note this is
+	## no decompression is performed (matching [HTTPRequest]). Note this is
 	## [i]not[/i] the same as refusing compression: sending no
 	## [code]Accept-Encoding[/code] tells the server any encoding is acceptable, so
 	## it may still return a [code]Content-Encoding: gzip[/code] body. You then
@@ -89,13 +89,13 @@ class Options:
 	## suppresses the automatic one.
 	## [br][br]
 	## Only [code]gzip[/code] is requested and decoded — never [code]deflate[/code],
-	## which is where this differs from native [HTTPRequest] (it advertises both).
+	## which is where this differs from [HTTPRequest] ([HTTPRequest] advertises both).
 	## HTTP [code]deflate[/code] is ambiguous: the spec says it is zlib-wrapped
 	## (RFC 1950), but many servers send raw deflate (RFC 1951) instead, and the two
 	## cannot be told apart reliably. Native [HTTPRequest] assumes zlib-wrapped and
 	## fails to decode raw-deflate responses — a rare bug that is hard to trace
 	## because it only surfaces against the uncommon servers that send raw deflate.
-	## C3HTTPRequest sidesteps it by never requesting deflate at all; gzip is
+	## C3Http sidesteps it by never requesting deflate at all; gzip is
 	## near-universal and brotli covers the rest, so deflate is effectively a rounding
 	## error on the modern web. If you genuinely need it, request it via
 	## [code]custom_headers[/code] and decode the bytes yourself.
@@ -119,12 +119,12 @@ class Options:
 	## [codeblock]
 	## # Count the connection-status changes via a callback.
 	## var status_changes: Array[int] = []
-	## var opts := C3HTTPRequest.Options.new()
+	## var opts := C3Http.Options.new()
 	## opts.use_threads = true
 	## opts.on_status_changed = func(status: HTTPClient.Status) -> void:
 	##     status_changes.append(status)
 	##
-	## await C3HTTPRequest.request("https://example.com",
+	## await C3Http.request("https://example.com",
 	##     PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
 	##
 	## # Every status change has already fired — none is still queued for a later
@@ -175,7 +175,7 @@ class Options:
 	## (echo it as a [code]Last-Event-ID[/code] header to resume after a drop; see
 	## also [member Response.sse_retry_ms] for the suggested backoff). When set,
 	## a 2xx response body is parsed as an SSE stream rather than collected:
-	## [member Response.body] stays empty and [method C3HTTPRequest.request]
+	## [member Response.body] stays empty and [method C3Http.request]
 	## resolves only when the stream closes (use [member cancellation_token] to
 	## stop it early). While streaming, [member accept_gzip] and
 	## [member download_file] are ignored, and [member timeout] becomes an idle
@@ -216,7 +216,7 @@ class Options:
 	var session: Session = null
 
 
-## The response returned by [method C3HTTPRequest.request].
+## The response returned by [method C3Http.request].
 class Response:
 	## [code]true[/code] when a response was received with a 2xx status code.
 	var ok := true
@@ -246,7 +246,7 @@ class Response:
 			if _text_cache == null:
 				_text_cache = body.get_string_from_utf8()
 				if _text_cache == "" and not body.is_empty():
-					push_error("C3HTTPRequest: response body is not valid UTF-8.")
+					push_error("C3Http: response body is not valid UTF-8.")
 			return _text_cache
 
 	var _text_cache: Variant = null
@@ -265,7 +265,7 @@ class Response:
 					_json_cache = parser.data
 				else:
 					push_error(
-						"C3HTTPRequest: response body is not valid JSON: "
+						"C3Http: response body is not valid JSON: "
 						+ parser.get_error_message()
 					)
 					_json_cache = null
@@ -476,15 +476,15 @@ class Session:
 		_mutex.unlock()
 
 
-## Test helper that intercepts [method C3HTTPRequest.request] calls.
+## Test helper that intercepts [method C3Http.request] calls.
 ## Install with [method install], configure canned responses with [method stub],
 ## and inspect recorded calls via [member calls]. Always pair [method install]
 ## with [method uninstall] in [code]after_each()[/code]. [br][br]
 ## [codeblock]
-## var mock: C3HTTPRequest.Mock
+## var mock: C3Http.Mock
 ##
 ## func before_each() -> void:
-##     mock = C3HTTPRequest.Mock.new()
+##     mock = C3Http.Mock.new()
 ##     mock.install()
 ##
 ## func after_each() -> void:
@@ -492,7 +492,7 @@ class Session:
 ##
 ## func test_example() -> void:
 ##     mock.stub().ok({"id": 1})
-##     var res := await C3HTTPRequest.request("https://api.example.com/users")
+##     var res := await C3Http.request("https://api.example.com/users")
 ##     assert_true(res.ok)
 ##     assert_eq(mock.last_call["url"], "https://api.example.com/users")
 ## [/codeblock]
@@ -517,13 +517,13 @@ class Mock extends _Impl:
 
 	var _stubs: Array = []
 
-	## Installs this mock as [code]C3HTTPRequest._impl[/code].
+	## Installs this mock as [code]C3Http._impl[/code].
 	func install() -> void:
-		C3HTTPRequest._impl = self
+		C3Http._impl = self
 
 	## Uninstalls this mock and restores normal request behavior.
 	func uninstall() -> void:
-		C3HTTPRequest._impl = _Impl.new()
+		C3Http._impl = _Impl.new()
 
 	## Returns a stub builder for [param url]. Omit [param url] to create
 	## the catch-all default stub, matched when no URL-specific stub exists.
@@ -1107,7 +1107,7 @@ class _Impl:
 		# state instead — fail loudly here rather than corrupting the result.
 		assert(
 			result is Response,
-			"C3HTTPRequest: threaded worker suspended; the worker path must run "
+			"C3Http: threaded worker suspended; the worker path must run "
 			+ "synchronously (see _pump). Did a new await get added to request()?"
 		)
 		var res: Response = result
@@ -1247,7 +1247,7 @@ class _Impl:
 	# Merges the caller's headers with the gzip opt-in. Our Accept-Encoding is added
 	# only when accept_gzip is on, the request isn't an SSE stream, and the caller
 	# hasn't already set their own Accept-Encoding — a caller-supplied value wins,
-	# matching native HTTPRequest. We advertise gzip only, never deflate; see the
+	# matching HTTPRequest. We advertise gzip only, never deflate; see the
 	# Options.accept_gzip doc comment for why.
 	func _build_request_headers(
 		custom_headers: PackedStringArray, accept_gzip: bool, streaming: bool
@@ -1264,7 +1264,7 @@ class _Impl:
 
 	# Builds the on-the-fly decompressor for a download, or null when none applies.
 	# Decompression is gated on accept_gzip (accept_gzip == false means the caller
-	# opted out, so raw bytes pass through unchanged, like native HTTPRequest). Only
+	# opted out, so raw bytes pass through unchanged, like HTTPRequest). Only
 	# gzip is decoded; see the Options.accept_gzip doc for why deflate isn't supported.
 	func _make_download_decoder(
 		resp_headers: PackedStringArray, accept_gzip: bool
@@ -1279,12 +1279,12 @@ class _Impl:
 
 	# Decompresses an in-memory gzip body, or returns it unchanged. Gated on
 	# accept_gzip (false means the caller opted out, so raw bytes pass through, like
-	# native HTTPRequest). Only gzip is decoded; see the Options.accept_gzip doc for why
+	# HTTPRequest). Only gzip is decoded; see the Options.accept_gzip doc for why
 	# deflate isn't supported.
 	#
 	# Decodes through the same StreamPeerGZIP feed-and-drain path as the download
 	# branch (_decode_chunk), feeding the whole body as one chunk — so both paths and
-	# native HTTPRequest behave identically. This deliberately avoids
+	# HTTPRequest behave identically. This deliberately avoids
 	# PackedByteArray.decompress_dynamic, whose binding collapses three distinct
 	# outcomes — a valid empty body, an over-limit body, and a corrupt body — into the
 	# same empty return, which made an empty gzipped body look over-limit.

@@ -2,7 +2,7 @@
 
 **Inherits:** [`RefCounted`](https://docs.godotengine.org/en/stable/classes/class_refcounted.html#class-refcounted)
 
-The response returned by [`request()`](c3httprequest.md#method-request).
+The response returned by [`request()`](c3http.md#method-request).
 
 ## Properties
 

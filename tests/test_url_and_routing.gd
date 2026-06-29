@@ -3,10 +3,10 @@ extends GutTest
 
 ## Unit tests for redirect method and body downgrade logic.
 class TestRedirectSemantics extends GutTest:
-	var impl: C3HTTPRequest._Impl
+	var impl: C3Http._Impl
 
 	func before_each() -> void:
-		impl = C3HTTPRequest._Impl.new()
+		impl = C3Http._Impl.new()
 
 	# _redirect_method
 	func test_301_post_becomes_get() -> void:
@@ -109,10 +109,10 @@ class TestRedirectSemantics extends GutTest:
 
 ## Unit tests for redirect URL resolution.
 class TestResolveRedirectUrl extends GutTest:
-	var impl: C3HTTPRequest._Impl
+	var impl: C3Http._Impl
 
 	func before_each() -> void:
-		impl = C3HTTPRequest._Impl.new()
+		impl = C3Http._Impl.new()
 
 	func test_absolute_https_returned_as_is() -> void:
 		assert_eq(
@@ -193,10 +193,10 @@ class TestResolveRedirectUrl extends GutTest:
 
 ## Unit tests for the internal URL parser.
 class TestParseUrl extends GutTest:
-	var impl: C3HTTPRequest._Impl
+	var impl: C3Http._Impl
 
 	func before_each() -> void:
-		impl = C3HTTPRequest._Impl.new()
+		impl = C3Http._Impl.new()
 
 	func test_https_default_port() -> void:
 		var r := impl._parse_url("https://example.com/path")
@@ -274,16 +274,16 @@ class TestParseUrl extends GutTest:
 
 ## Tests for the per-scheme proxy routing decision in [method _Impl._resolve_proxies].
 class TestResolveProxies extends GutTest:
-	var impl: C3HTTPRequest._Impl
+	var impl: C3Http._Impl
 
 	func before_each() -> void:
-		impl = C3HTTPRequest._Impl.new()
+		impl = C3Http._Impl.new()
 
 	func test_no_proxy_returns_empty() -> void:
-		assert_true(impl._resolve_proxies(C3HTTPRequest.Options.new()).is_empty())
+		assert_true(impl._resolve_proxies(C3Http.Options.new()).is_empty())
 
 	func test_both_schemes_routed_independently() -> void:
-		var opts := C3HTTPRequest.Options.new()
+		var opts := C3Http.Options.new()
 		opts.http_proxy_host = "http.proxy.example"
 		opts.http_proxy_port = 8080
 		opts.https_proxy_host = "https.proxy.example"
@@ -293,7 +293,7 @@ class TestResolveProxies extends GutTest:
 		assert_eq(proxies["https"], ["https.proxy.example", 8443])
 
 	func test_only_http_proxy_set() -> void:
-		var opts := C3HTTPRequest.Options.new()
+		var opts := C3Http.Options.new()
 		opts.http_proxy_host = "http.proxy.example"
 		opts.http_proxy_port = 8080
 		var proxies := impl._resolve_proxies(opts)
@@ -301,7 +301,7 @@ class TestResolveProxies extends GutTest:
 		assert_false(proxies.has("https"))
 
 	func test_only_https_proxy_set() -> void:
-		var opts := C3HTTPRequest.Options.new()
+		var opts := C3Http.Options.new()
 		opts.https_proxy_host = "https.proxy.example"
 		opts.https_proxy_port = 8443
 		var proxies := impl._resolve_proxies(opts)

@@ -2,15 +2,15 @@
 
 **Inherits:** [`RefCounted`](https://docs.godotengine.org/en/stable/classes/class_refcounted.html#class-refcounted)
 
-Test helper that intercepts [`request()`](c3httprequest.md#method-request) calls. Install with [`install()`](#method-install), configure canned responses with [`stub()`](#method-stub), and inspect recorded calls via [`calls`](#property-calls). Always pair [`install()`](#method-install) with [`uninstall()`](#method-uninstall) in `after_each()`.
+Test helper that intercepts [`request()`](c3http.md#method-request) calls. Install with [`install()`](#method-install), configure canned responses with [`stub()`](#method-stub), and inspect recorded calls via [`calls`](#property-calls). Always pair [`install()`](#method-install) with [`uninstall()`](#method-uninstall) in `after_each()`.
 
 
 
 ```gdscript
-var mock: C3HTTPRequest.Mock
+var mock: C3Http.Mock
 
 func before_each() -> void:
-    mock = C3HTTPRequest.Mock.new()
+    mock = C3Http.Mock.new()
     mock.install()
 
 func after_each() -> void:
@@ -18,7 +18,7 @@ func after_each() -> void:
 
 func test_example() -> void:
     mock.stub().ok({"id": 1})
-    var res := await C3HTTPRequest.request("https://api.example.com/users")
+    var res := await C3Http.request("https://api.example.com/users")
     assert_true(res.ok)
     assert_eq(mock.last_call["url"], "https://api.example.com/users")
 ```
@@ -58,7 +58,7 @@ The most recent call dictionary, or an empty [`Dictionary`](https://docs.godoten
 
 ### `void` `install()` { #method-install }
 
-Installs this mock as `C3HTTPRequest._impl`.
+Installs this mock as `C3Http._impl`.
 
 ### `void` `uninstall()` { #method-uninstall }
 

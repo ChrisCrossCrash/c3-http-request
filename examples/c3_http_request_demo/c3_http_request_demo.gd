@@ -29,7 +29,7 @@ func demo_get() -> void:
 	output_overlay.print_with_overlay("\n--- GET ---")
 	# accept_gzip is true by default: Accept-Encoding: gzip is injected and
 	# the response body is transparently decompressed.
-	var res := await C3HTTPRequest.request(
+	var res := await C3Http.request(
 		"https://jsonplaceholder.typicode.com/todos/1"
 	)
 	if not res.ok:
@@ -46,7 +46,7 @@ func demo_get() -> void:
 
 func demo_post() -> void:
 	output_overlay.print_with_overlay("\n--- POST ---")
-	var res := await C3HTTPRequest.request(
+	var res := await C3Http.request(
 		"https://jsonplaceholder.typicode.com/posts",
 		PackedStringArray(["Content-Type: application/json"]),
 		HTTPClient.METHOD_POST,
@@ -62,7 +62,7 @@ func demo_post() -> void:
 func demo_not_found() -> void:
 	output_overlay.print_with_overlay("\n--- 404 ---")
 	# Any non-2xx status sets res.ok = false and populates res.error.
-	var res := await C3HTTPRequest.request(
+	var res := await C3Http.request(
 		"https://jsonplaceholder.typicode.com/todos/9999"
 	)
 	output_overlay.print_with_overlay("ok:     ", res.ok)
@@ -74,9 +74,9 @@ func demo_not_found() -> void:
 func demo_timeout() -> void:
 	output_overlay.print_with_overlay("\n--- Timeout ---")
 	# timeout lives in Options, so it is per-call and never leaks to others.
-	var opts := C3HTTPRequest.Options.new()
+	var opts := C3Http.Options.new()
 	opts.timeout = 0.001  # 1 ms — fires before any real response arrives
-	var res := await C3HTTPRequest.request(
+	var res := await C3Http.request(
 		"https://jsonplaceholder.typicode.com/todos/1",
 		PackedStringArray(),
 		HTTPClient.METHOD_GET,
@@ -89,9 +89,9 @@ func demo_timeout() -> void:
 
 func demo_body_size_limit() -> void:
 	output_overlay.print_with_overlay("\n--- Body size limit ---")
-	var opts := C3HTTPRequest.Options.new()
+	var opts := C3Http.Options.new()
 	opts.body_size_limit = 1000  # /posts returns ~27 KB
-	var res := await C3HTTPRequest.request(
+	var res := await C3Http.request(
 		"https://jsonplaceholder.typicode.com/posts",
 		PackedStringArray(),
 		HTTPClient.METHOD_GET,
@@ -107,9 +107,9 @@ func demo_redirect_limit() -> void:
 	# httpbin's /redirect/5 issues a 5-hop chain of 302s. With a budget of 2 we
 	# stop partway and get the next 302 back: ok is false, kind is HTTP, status
 	# is 302, and the message explains the budget was spent.
-	var opts := C3HTTPRequest.Options.new()
+	var opts := C3Http.Options.new()
 	opts.max_redirects = 2
-	var res := await C3HTTPRequest.request(
+	var res := await C3Http.request(
 		"https://httpbin.org/redirect/5",
 		PackedStringArray(),
 		HTTPClient.METHOD_GET,
@@ -124,9 +124,9 @@ func demo_redirect_limit() -> void:
 func demo_download_file() -> void:
 	output_overlay.print_with_overlay("\n--- Download to file ---")
 	var path := "user://c3_demo_download.json"
-	var opts := C3HTTPRequest.Options.new()
+	var opts := C3Http.Options.new()
 	opts.download_file = path
-	var res := await C3HTTPRequest.request(
+	var res := await C3Http.request(
 		"https://jsonplaceholder.typicode.com/todos/1",
 		PackedStringArray(),
 		HTTPClient.METHOD_GET,
@@ -148,7 +148,7 @@ func demo_progress() -> void:
 	# body arrive in several reads, so on_progress fires multiple times.
 	# accept_gzip is disabled so the transferred bytes match the Content-Length
 	# (gzip would report the compressed size instead).
-	var opts := C3HTTPRequest.Options.new()
+	var opts := C3Http.Options.new()
 	opts.accept_gzip = false
 	opts.download_chunk_size = 16384
 	opts.on_progress = func(bytes_received: int, total_bytes: int) -> void:
@@ -160,7 +160,7 @@ func demo_progress() -> void:
 		else:
 			# Chunked responses have no Content-Length, so total_bytes is -1.
 			output_overlay.print_with_overlay("progress: %d bytes (total unknown)" % bytes_received)
-	var res := await C3HTTPRequest.request(
+	var res := await C3Http.request(
 		"https://httpbin.org/bytes/102400",
 		PackedStringArray(),
 		HTTPClient.METHOD_GET,
@@ -179,10 +179,10 @@ func demo_status() -> void:
 	# on_status_changed fires as the underlying HTTPClient advances through its
 	# lifecycle — resolving, connecting, requesting, then reading the body. It is
 	# observational only; the request's outcome still arrives via the Response.
-	var opts := C3HTTPRequest.Options.new()
+	var opts := C3Http.Options.new()
 	opts.on_status_changed = func(status: HTTPClient.Status) -> void:
 		output_overlay.print_with_overlay("status: ", _status_name(status))
-	var res := await C3HTTPRequest.request(
+	var res := await C3Http.request(
 		"https://jsonplaceholder.typicode.com/todos/1",
 		PackedStringArray(),
 		HTTPClient.METHOD_GET,
@@ -195,14 +195,14 @@ func demo_status() -> void:
 
 func demo_cancellation() -> void:
 	output_overlay.print_with_overlay("\n--- Cancellation ---")
-	var token := C3HTTPRequest.CancellationToken.new()
-	var opts := C3HTTPRequest.Options.new()
+	var token := C3Http.CancellationToken.new()
+	var opts := C3Http.Options.new()
 	opts.cancellation_token = token
 	# Pre-cancel: no connection is opened at all.
 	# To cancel mid-flight, call token.cancel() from another coroutine while
 	# this function is suspended at the await below.
 	token.cancel()
-	var res := await C3HTTPRequest.request(
+	var res := await C3Http.request(
 		"https://jsonplaceholder.typicode.com/todos/1",
 		PackedStringArray(),
 		HTTPClient.METHOD_GET,
@@ -232,17 +232,17 @@ func demo_sse() -> void:
 	# Single-element Arrays so the callback's writes are visible out here: GDScript
 	# lambdas capture value types (like an int or String) by copy, but Array by
 	# reference.
-	var token := C3HTTPRequest.CancellationToken.new()
+	var token := C3Http.CancellationToken.new()
 	var last_id := [""]
 	var counter := [0]
-	var res: C3HTTPRequest.Response = null
+	var res: C3Http.Response = null
 	while true:
 		var headers := PackedStringArray([
 			"User-Agent: c3-http-request-demo (https://github.com)"
 		])
 		if not last_id[0].is_empty():
 			headers.append("Last-Event-ID: " + last_id[0])
-		var opts := C3HTTPRequest.Options.new()
+		var opts := C3Http.Options.new()
 		opts.cancellation_token = token
 		opts.on_sse_event = func(data: String, event_type: String, id: String) -> void:
 			last_id[0] = id  # remember where to resume from
@@ -259,7 +259,7 @@ func demo_sse() -> void:
 			output_overlay.print_with_overlay(line)
 			if counter[0] >= SSE_EVENT_COUNT:
 				token.cancel()
-		res = await C3HTTPRequest.request(
+		res = await C3Http.request(
 			"https://stream.wikimedia.org/v2/stream/recentchange",
 			headers,
 			HTTPClient.METHOD_GET,

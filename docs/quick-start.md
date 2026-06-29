@@ -2,7 +2,7 @@
 
 ```gdscript
 # GET
-var res := await C3HTTPRequest.request("https://api.example.com/todos/1")
+var res := await C3Http.request("https://api.example.com/todos/1")
 if not res.ok:
     push_error(str(res.error))
     return
@@ -12,7 +12,7 @@ print(res.json)    # response body parsed as JSON (Variant; null if invalid)
 print(res.body)    # raw response body bytes (PackedByteArray)
 
 # POST with a JSON body and custom headers
-var res2 := await C3HTTPRequest.request(
+var res2 := await C3Http.request(
     "https://api.example.com/posts",
     PackedStringArray([
         "Content-Type: application/json",
@@ -23,7 +23,7 @@ var res2 := await C3HTTPRequest.request(
 )
 
 # POST a raw binary body (sent as-is, not UTF-8 encoded)
-var res_raw := await C3HTTPRequest.request_raw(
+var res_raw := await C3Http.request_raw(
     "https://api.example.com/upload",
     PackedStringArray(["Content-Type: application/octet-stream"]),
     HTTPClient.METHOD_POST,
@@ -31,9 +31,9 @@ var res_raw := await C3HTTPRequest.request_raw(
 )
 
 # Per-request options
-var opts := C3HTTPRequest.Options.new()
+var opts := C3Http.Options.new()
 opts.timeout = 10.0
-var res3 := await C3HTTPRequest.request(url, PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
+var res3 := await C3Http.request(url, PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
 ```
 
 Redirects are followed automatically (up to [`Options.max_redirects`](api/options.md#property-max_redirects)), so `res` reflects the final response the chain lands on.

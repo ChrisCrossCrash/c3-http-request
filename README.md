@@ -1,17 +1,17 @@
-# C3 HTTP Request for Godot
+# C3 HTTP Request (C3Http)
 
-`C3HTTPRequest` is a lightweight nodeless replacement for [`HTTPRequest`](https://docs.godotengine.org/en/stable/classes/class_httprequest.html). It offers significant improvements in ergonomics, performance, and testability.
+`C3Http` is a lightweight nodeless replacement for [`HTTPRequest`](https://docs.godotengine.org/en/stable/classes/class_httprequest.html). It offers significant improvements in ergonomics, performance, and testability.
 
 **[Full documentation](https://chriscrosscrash.github.io/c3-http-request/)**
 
-Here is a complete working example of how to use C3HTTPRequest in a script:
+Here is a complete working example of how to use `C3Http` in a script:
 
 ```gdscript
 extends Node2D
 
 
 func _ready() -> void:
-	var res := await C3HTTPRequest.request("https://jsonplaceholder.typicode.com/todos/1")
+	var res := await C3Http.request("https://jsonplaceholder.typicode.com/todos/1")
 	if res.ok:
 		print(res.body.get_string_from_utf8())  # .body is PackedStringArray
 		print(res.text)                         # .text is String
@@ -25,39 +25,39 @@ func _ready() -> void:
 
 - Static `await`-able `request()` callable from any script — no `Node` to add or configure
 - Every call returns a typed `Response` object — a single `if not res.ok` check covers transport failures, timeouts, and non-2xx statuses alike
-- Per-request `Options` that mirror the native `HTTPRequest` node's properties (`use_threads`, `accept_gzip`, etc.), plus additional features
+- Per-request `Options` that mirror `HTTPRequest`'s properties (`use_threads`, `accept_gzip`, etc.), plus additional features
 - HTTP keep-alive — set `Options.session` to pool and reuse connections across calls to the same host
 - Server-Sent Events (SSE) — pass an `on_sse_event` callback to consume a streaming `text/event-stream` response incrementally, with the `Last-Event-ID` cursor and `retry:` backoff surfaced for reconnects
 - Download progress — pass an `on_progress` callback to track `(bytes_received, total_bytes)` as the body arrives
 - Cancellation token — cancel an in-flight request from another coroutine or signal handler
 - Connection status — pass an `on_status_changed` callback to observe the `HTTPClient` lifecycle (resolving, connecting, requesting, body)
-- Built-in test mock — `C3HTTPRequest.Mock` intercepts all requests in tests without a network, with stubs to configure responses and a call log for assertions
+- Built-in test mock — `C3Http.Mock` intercepts all requests in tests without a network, with stubs to configure responses and a call log for assertions
 
 ## Comparison with HTTPRequest
 
-| Feature                                 | C3HTTPRequest | HTTPRequest |
-| --------------------------------------- | :-----------: | :---------: |
-| No Node to add or configure             |      ✅       |     ❌      |
-| `await`-able (no signal wiring)         |      ✅       |     ❌      |
-| Single `ok` check (transport + non-2xx) |      ✅       |     ❌      |
-| Decoded `text` body accessor            |      ✅       |     ❌      |
-| Parsed `json` body accessor             |      ✅       |     ❌      |
-| Server-Sent Events (SSE) streaming      |      ✅       |     ❌      |
-| Typed `RequestError` with `Kind`        |      ✅       |     ❌      |
-| Built-in test mock                      |      ✅       |     ❌      |
-| HTTP keep-alive and connection reuse    |      ✅       |     ❌      |
-| Cancellation                            |      ✅       |     ✅      |
-| Timeout                                 |      ✅       |     ✅      |
-| Gzip decompression                      |      ✅       |     ✅      |
-| Redirect following                      |      ✅       |     ✅      |
-| Download to file                        |      ✅       |     ✅      |
-| Body size limit                         |      ✅       |     ✅      |
-| Custom TLS options                      |      ✅       |     ✅      |
-| Raw request body (bytes)                |      ✅       |     ✅      |
-| HTTP/HTTPS proxy                        |      ✅       |     ✅      |
-| Download progress events                |      ✅       |     ✅      |
-| Connection status checking              |      ✅       |     ✅      |
-| Threaded requests (off main loop)       |      ✅       |     ✅      |
+| Feature                                 | `C3Http` | `HTTPRequest` |
+| --------------------------------------- | :------: | :-----------: |
+| No Node to add or configure             |    ✅    |      ❌       |
+| `await`-able (no signal wiring)         |    ✅    |      ❌       |
+| Single `ok` check (transport + non-2xx) |    ✅    |      ❌       |
+| Decoded `text` body accessor            |    ✅    |      ❌       |
+| Parsed `json` body accessor             |    ✅    |      ❌       |
+| Server-Sent Events (SSE) streaming      |    ✅    |      ❌       |
+| Typed `RequestError` with `Kind`        |    ✅    |      ❌       |
+| Built-in test mock                      |    ✅    |      ❌       |
+| HTTP keep-alive and connection reuse    |    ✅    |      ❌       |
+| Cancellation                            |    ✅    |      ✅       |
+| Timeout                                 |    ✅    |      ✅       |
+| Gzip decompression                      |    ✅    |      ✅       |
+| Redirect following                      |    ✅    |      ✅       |
+| Download to file                        |    ✅    |      ✅       |
+| Body size limit                         |    ✅    |      ✅       |
+| Custom TLS options                      |    ✅    |      ✅       |
+| Raw request body (bytes)                |    ✅    |      ✅       |
+| HTTP/HTTPS proxy                        |    ✅    |      ✅       |
+| Download progress events                |    ✅    |      ✅       |
+| Connection status checking              |    ✅    |      ✅       |
+| Threaded requests (off main loop)       |    ✅    |      ✅       |
 
 ## Benchmarks
 
@@ -65,9 +65,9 @@ A benchmark analysis was performed using Godot 4.7 on Windows 11 against a remot
 
 **Highlights:**
 
-- **C3HTTPRequest excels at large downloads:** In its default `use_threads = false` mode, the native node reads exactly one chunk per frame, capping throughput at `download_chunk_size × frame_rate` (~3.93 MB/s at 60 fps with 64 KB chunks) no matter how fast the link is. C3HTTPRequest drains every available chunk each frame, so its time tracks bandwidth instead — ~5× faster at 8 MB (487 ms vs 2367 ms) and ~9× faster at 32 MB (984 ms vs 8800 ms).
-- **Sessions (keep-alive) are the strongest lever:** With C3HTTPRequest, passing a shared `Session` via `Options.session` reuses a warm TLS/TCP connection, eliminating ~125 ms of handshake and TCP slow-start per request: single-request latency drops from ~162 ms to ~34 ms, and a 400 KB download from ~300 ms to ~51 ms. Native `HTTPRequest` has no equivalent.
-- **Latency: C3HTTPRequest is ~1 frame faster when `use_threads = false`:** With `use_threads = false` (the default for both clients) at any capped frame rate, C3HTTPRequest resolves one frame earlier than native (e.g. 183 ms vs 200 ms at 60 fps) because when the underlying `HTTPClient`'s status transitions (e.g. from requesting to reading the body after headers arrive), C3HTTPRequest re-reads the client status in the same loop iteration rather than waiting for the next frame.
+- **`C3Http` excels at large downloads:** In its default `use_threads = false` mode, `HTTPRequest` reads exactly one chunk per frame, capping throughput at `download_chunk_size × frame_rate` (~3.93 MB/s at 60 fps with 64 KB chunks) no matter how fast the link is. `C3Http` drains every available chunk each frame, so its time tracks bandwidth instead — ~5× faster at 8 MB (487 ms vs 2367 ms) and ~9× faster at 32 MB (984 ms vs 8800 ms).
+- **Sessions (keep-alive) are the strongest lever:** With `C3Http`, passing a shared `Session` via `Options.session` reuses a warm TLS/TCP connection, eliminating ~125 ms of handshake and TCP slow-start per request: single-request latency drops from ~162 ms to ~34 ms, and a 400 KB download from ~300 ms to ~51 ms. Native `HTTPRequest` has no equivalent.
+- **Latency: `C3Http` is ~1 frame faster when `use_threads = false`:** With `use_threads = false` (the default for both clients) at any capped frame rate, `C3Http` resolves one frame earlier than native (e.g. 183 ms vs 200 ms at 60 fps) because when the underlying `HTTPClient`'s status transitions (e.g. from requesting to reading the body after headers arrive), `C3Http` re-reads the client status in the same loop iteration rather than waiting for the next frame.
 
 ## Compatibility
 
@@ -75,7 +75,7 @@ Tested on Godot 4.7.x with automated ([GUT](https://github.com/bitwes/Gut)) and 
 
 ## Installation
 
-Click the "Asset Store" tab at the top of the Godot editor and search for "C3 HTTP Request". Then click "Download" and "Install". The addon will be automatically added to your project, and `C3HTTPRequest` will be available as a global class immediately — no plugin activation required.
+Click the "Asset Store" tab at the top of the Godot editor and search for "C3 HTTP Request". Then click "Download" and "Install". The addon will be automatically added to your project, and `C3Http` will be available as a global class immediately — no plugin activation required.
 
 Alternatively, download the latest release from [GitHub](https://github.com/ChrisCrossCrash/c3-http-request/releases) and copy the `addons/c3_http_request` folder into your project's `addons/` directory.
 
@@ -83,7 +83,7 @@ Alternatively, download the latest release from [GitHub](https://github.com/Chri
 
 ```gdscript
 # GET
-var res := await C3HTTPRequest.request("https://api.example.com/todos/1")
+var res := await C3Http.request("https://api.example.com/todos/1")
 if not res.ok:
     push_error(str(res.error))
     return
@@ -93,7 +93,7 @@ print(res.json)    # response body parsed as JSON (Variant; null if invalid)
 print(res.body)    # raw response body bytes (PackedByteArray)
 
 # POST with a JSON body and custom headers
-var res2 := await C3HTTPRequest.request(
+var res2 := await C3Http.request(
     "https://api.example.com/posts",
     PackedStringArray([
         "Content-Type: application/json",
@@ -104,7 +104,7 @@ var res2 := await C3HTTPRequest.request(
 )
 
 # POST a raw binary body (sent as-is, not UTF-8 encoded)
-var res_raw := await C3HTTPRequest.request_raw(
+var res_raw := await C3Http.request_raw(
     "https://api.example.com/upload",
     PackedStringArray(["Content-Type: application/octet-stream"]),
     HTTPClient.METHOD_POST,
@@ -112,9 +112,9 @@ var res_raw := await C3HTTPRequest.request_raw(
 )
 
 # Per-request options
-var opts := C3HTTPRequest.Options.new()
+var opts := C3Http.Options.new()
 opts.timeout = 10.0
-var res3 := await C3HTTPRequest.request(url, PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
+var res3 := await C3Http.request(url, PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
 ```
 
 ## Response
@@ -193,13 +193,13 @@ See the [Download progress guide](docs/guides/download-progress.md) for usage an
 
 ## Connection status
 
-Set `Options.on_status_changed` to a `Callable` to observe the underlying `HTTPClient` as it advances through its lifecycle — the equivalent of polling `get_http_client_status()` on the native node. The callback fires once per change with an `HTTPClient.Status` value.
+Set `Options.on_status_changed` to a `Callable` to observe the underlying `HTTPClient` as it advances through its lifecycle — the equivalent of `HTTPRequest`'s `get_http_client_status()`. The callback fires once per change with an `HTTPClient.Status` value.
 
 See the [Connection status guide](docs/guides/connection-status.md) for usage and examples.
 
 ## Threaded requests
 
-By default the polling loop yields to the scene tree once per frame (the same cadence as the native `HTTPRequest` node). Set `Options.use_threads` to `true` to run the loop on a dedicated background thread that polls at OS speed — lowering latency for fast endpoints and keeping the main thread free during large or streaming downloads. The `await` API is unchanged; callbacks are auto-marshaled back to the main thread.
+By default the polling loop yields to the scene tree once per frame (the same cadence as `HTTPRequest`). Set `Options.use_threads` to `true` to run the loop on a dedicated background thread that polls at OS speed — lowering latency for fast endpoints and keeping the main thread free during large or streaming downloads. The `await` API is unchanged; callbacks are auto-marshaled back to the main thread.
 
 See the [Threaded requests guide](docs/guides/threaded-requests.md) for details and caveats.
 
@@ -211,6 +211,6 @@ See the [Sessions guide](docs/guides/sessions.md) for usage and examples.
 
 ## Testing
 
-`C3HTTPRequest.Mock` intercepts all `request()` calls in tests without touching the network. Install it in `before_each` and uninstall in `after_each`; register canned responses with `mock.stub()` and assert outgoing calls via `mock.calls` / `mock.call_count` / `mock.last_call`.
+`C3Http.Mock` intercepts all `request()` calls in tests without touching the network. Install it in `before_each` and uninstall in `after_each`; register canned responses with `mock.stub()` and assert outgoing calls via `mock.calls` / `mock.call_count` / `mock.last_call`.
 
 See the [Testing guide](docs/guides/testing.md) for full usage, including stubbing and call assertions.

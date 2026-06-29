@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.0] - 2026-06-24
+## [0.4.0] - TBD
 
 ### Added
 
@@ -12,8 +12,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- **Breaking:** the class has been renamed from `C3HTTPRequest` to `C3Http`. All references to `C3HTTPRequest.*` must be updated to `C3Http.*` (e.g. `C3Http.request()`, `C3Http.Options`, `C3Http.Response`).
 - **Breaking:** the `Options.on_sse_event` callback now receives a third argument, `last_event_id: String`, so its signature is `on_sse_event.call(data, event_type, last_event_id)`. Existing two-argument sinks must add the parameter. `last_event_id` is the stream's `id:` cursor and persists across events per the SSE spec — an event with no `id:` line still reports the most recent one. Together with `Response.sse_retry_ms`, this gives a caller everything needed to reconnect a dropped stream (echo the id as a `Last-Event-ID` header after waiting the suggested backoff); the client still does not auto-reconnect itself.
-- **Breaking:** the addon-specific `C3HTTPRequest.Method` enum has been removed in favor of Godot's native `HTTPClient.Method`, mirroring the native `HTTPRequest` node and dropping an internal translation layer. Migrate by replacing `C3HTTPRequest.Method.GET` with `HTTPClient.METHOD_GET`, `C3HTTPRequest.Method.POST` with `HTTPClient.METHOD_POST`, and so on for the remaining methods.
+- **Breaking:** the addon-specific `Method` enum has been removed in favor of Godot's native `HTTPClient.Method`, mirroring `HTTPRequest` and dropping an internal translation layer. Migrate by replacing `C3HTTPRequest.Method.GET` with `HTTPClient.METHOD_GET`, `C3HTTPRequest.Method.POST` with `HTTPClient.METHOD_POST`, and so on for the remaining methods.
 
 ## [0.3.1] - 2026-06-22
 
@@ -32,12 +33,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- Streaming gzip decompression for `download_file` downloads: gzipped responses are now decoded incrementally through `StreamPeerGZIP` (feed-and-drain) so the file holds decoded content instead of raw compressed bytes, with bounded memory. A per-chunk budget stops a decompression bomb before it balloons memory, and `body_size_limit` now applies to the decompressed bytes written to disk (matching native `HTTPRequest`).
+- Streaming gzip decompression for `download_file` downloads: gzipped responses are now decoded incrementally through `StreamPeerGZIP` (feed-and-drain) so the file holds decoded content instead of raw compressed bytes, with bounded memory. A per-chunk budget stops a decompression bomb before it balloons memory, and `body_size_limit` now applies to the decompressed bytes written to disk (matching `HTTPRequest`).
 - [docs/streaming-decompression.md](docs/streaming-decompression.md) explaining the `StreamPeerGZIP` feed-and-drain loop, back-pressure, and the zip-bomb and no-progress guards.
 
 ### Changed
 
-- **Breaking:** automatic `deflate`-encoded response handling is no longer a feature because it simply cannot be done in a way that reliably distinguishes raw-deflate from zlib-wrapped deflate. The client now advertises `Accept-Encoding: gzip` only and never decodes `Content-Encoding: deflate`, sidestepping the [raw-vs-zlib-wrapped ambiguity](https://www.zlib.net/zlib_faq.html#faq39) that silently breaks native `HTTPRequest` on raw-deflate responses. You can still request deflate by setting `Accept-Encoding: deflate` yourself — a caller-supplied `Accept-Encoding` header takes precedence over the automatic one — but the client passes the encoded body through untouched, leaving you to decompress it. [Go's `net/http`](https://github.com/golang/go/blob/fd6f414c65e61a51cf12c98ef473957d73f97c44/src/net/http/transport.go#L3003-L3005) makes the same gzip-only choice for the same reason — its source comment reads "Deflate is ambiguous and not as universally supported anyway" and cites the same zlib FAQ linked to above.
+- **Breaking:** automatic `deflate`-encoded response handling is no longer a feature because it simply cannot be done in a way that reliably distinguishes raw-deflate from zlib-wrapped deflate. The client now advertises `Accept-Encoding: gzip` only and never decodes `Content-Encoding: deflate`, sidestepping the [raw-vs-zlib-wrapped ambiguity](https://www.zlib.net/zlib_faq.html#faq39) that silently breaks `HTTPRequest` on raw-deflate responses. You can still request deflate by setting `Accept-Encoding: deflate` yourself — a caller-supplied `Accept-Encoding` header takes precedence over the automatic one — but the client passes the encoded body through untouched, leaving you to decompress it. [Go's `net/http`](https://github.com/golang/go/blob/fd6f414c65e61a51cf12c98ef473957d73f97c44/src/net/http/transport.go#L3003-L3005) makes the same gzip-only choice for the same reason — its source comment reads "Deflate is ambiguous and not as universally supported anyway" and cites the same zlib FAQ linked to above.
 - In-memory gzipped bodies are decoded through the same streaming path instead of `PackedByteArray.decompress_dynamic`.
 - `download_file` is opened only once the response body starts arriving, so a request that fails while resolving, connecting, or sending never creates or truncates the file. A partial file is removed when a transfer fails after writing has begun (timeout, cancellation, decode error, or size-limit breach).
 - Header lookups (`Content-Encoding`, etc.) now match header names case- and whitespace-insensitively.

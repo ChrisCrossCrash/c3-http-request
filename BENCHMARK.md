@@ -1,4 +1,4 @@
-# C3HTTPRequest benchmark vs native HTTPRequest
+# C3Http benchmark vs native HTTPRequest
 ```
 commit 4041d55
 Godot 4.7-stable (official) | Windows | AMD Ryzen 5 7600 6-Core Processor | forward_plus renderer
@@ -8,11 +8,11 @@ All timing values are in milliseconds. Tables show medians; five-number summary 
 | ID       | Description                                              |
 | -------- | -------------------------------------------------------- |
 | nat_coop | native HTTPRequest node, cooperative (default) polling   |
-| c3_coop  | C3HTTPRequest, cooperative (default) polling             |
-| c3s_coop | C3HTTPRequest, cooperative polling, session (keep-alive) |
+| c3_coop  | C3Http, cooperative (default) polling             |
+| c3s_coop | C3Http, cooperative polling, session (keep-alive) |
 | nat_thr  | native HTTPRequest node, threaded polling                |
-| c3_thr   | C3HTTPRequest, threaded polling                          |
-| c3s_thr  | C3HTTPRequest, threaded polling, session (keep-alive)    |
+| c3_thr   | C3Http, threaded polling                          |
+| c3s_thr  | C3Http, threaded polling, session (keep-alive)    |
 
 ## Single-request latency (median of 25 requests)
 Round-trip time for a single small GET request across frame-rate caps.

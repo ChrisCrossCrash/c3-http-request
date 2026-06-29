@@ -1,5 +1,5 @@
 extends Node
-## Benchmark: C3HTTPRequest vs Godot's native HTTPRequest, each in cooperative
+## Benchmark: C3Http vs Godot's HTTPRequest, each in cooperative
 ## and threaded modes, plus a keep-alive C3 (session) variant.
 ##
 ## Targets the hosted benchmark API at api.chriskumm.com by default. To run
@@ -46,9 +46,9 @@ const DOWNLOAD_PATH := "user://benchmark_download.bin"
 # Number of recent frames the on-screen FPS readout averages over.
 const FPS_WINDOW := 30
 # Status-label colors: client (C3 vs native) and mode (cooperative vs threaded).
-const COLOR_C3 := "#4ec9b0"        # teal — C3HTTPRequest
+const COLOR_C3 := "#4ec9b0"        # teal — C3Http
 const COLOR_SESSION := "#dcdcaa"   # gold — C3 (session)
-const COLOR_NATIVE := "#e0a060"    # amber — native HTTPRequest
+const COLOR_NATIVE := "#e0a060"    # amber — HTTPRequest
 const COLOR_COOP := "#569cd6"      # blue — cooperative
 const COLOR_THREADED := "#c586c0"  # purple — threaded
 const COLOR_DIM := "#888888"       # gray — throttle line
@@ -58,12 +58,12 @@ const COLOR_DIM := "#888888"       # gray — throttle line
 # here sets the interleave order within a run (variants share machine-load drift
 # evenly) and the on-screen status sequence.
 var _trials: Array[_TrialConfig] = [
-	_TrialConfig.new("c3_coop",  "C3HTTPRequest",       false, false, false),
-	_TrialConfig.new("c3_thr",   "C3HTTPRequest",       false, true,  false),
+	_TrialConfig.new("c3_coop",  "C3Http",       false, false, false),
+	_TrialConfig.new("c3_thr",   "C3Http",       false, true,  false),
 	_TrialConfig.new("c3s_coop", "C3 (session)",        false, false, true),
 	_TrialConfig.new("c3s_thr",  "C3 (session)",        false, true,  true),
-	_TrialConfig.new("nat_coop", "native HTTPRequest",  true,  false, false),
-	_TrialConfig.new("nat_thr",  "native HTTPRequest",  true,  true,  false),
+	_TrialConfig.new("nat_coop", "HTTPRequest",  true,  false, false),
+	_TrialConfig.new("nat_thr",  "HTTPRequest",  true,  true,  false),
 ]
 
 # Human-readable description of the benchmark phase currently running, shown in
@@ -138,7 +138,7 @@ func _bench_latency(url: String) -> void:
 		var label := "uncapped" if cap == 0 else "%d fps" % cap
 		# A fresh session per cap so each section starts with an empty pool.
 		# Warmup calls pre-fill it before timing begins.
-		var session := C3HTTPRequest.Session.new()
+		var session := C3Http.Session.new()
 		var samples := await _collect(url, session, WARMUPS, RUNS)
 		Engine.max_fps = 0
 		rows.append({label = label, samples = samples})
@@ -158,7 +158,7 @@ func _bench_slow_start() -> void:
 	Engine.max_fps = SLOW_START_FPS
 	# A single session shared across all sizes so the cwnd is already warm by the
 	# time the 20 KB and 400 KB rows run.
-	var session := C3HTTPRequest.Session.new()
+	var session := C3Http.Session.new()
 	var rows: Array[Dictionary] = []
 	for kb: int in SLOW_START_SIZES_KB:
 		var url := DOWNLOAD_URL % (kb * 1024)
@@ -187,7 +187,7 @@ func _bench_download() -> void:
 	Engine.max_fps = DOWNLOAD_FPS
 	# A session shared across sizes so its connections are already warm by the
 	# time timing begins.
-	var session := C3HTTPRequest.Session.new()
+	var session := C3Http.Session.new()
 	var rows: Array[Dictionary] = []
 	for mb: int in DOWNLOAD_SIZES_MB:
 		var url := DOWNLOAD_URL % (mb * 1024 * 1024)
@@ -209,7 +209,7 @@ func _bench_download() -> void:
 # timed passes, interleaving the variants within each pass. Returns a dictionary
 # keyed by trial id, each value an Array[int] of per-run elapsed microseconds.
 func _collect(
-	url: String, session: C3HTTPRequest.Session, warmups: int, reps: int,
+	url: String, session: C3Http.Session, warmups: int, reps: int,
 	download_path := "", download_chunk := 0
 ) -> Dictionary:
 	for _i: int in warmups:
@@ -232,7 +232,7 @@ func _collect(
 # builds Options from its fields (threading, session, download); a native trial
 # routes to the HTTPRequest node path.
 func _time(
-	trial: _TrialConfig, url: String, session: C3HTTPRequest.Session,
+	trial: _TrialConfig, url: String, session: C3Http.Session,
 	download_path := "", download_chunk := 0
 ) -> int:
 	_show_status(trial)
@@ -240,7 +240,7 @@ func _time(
 		return await _time_native(
 			url, trial.use_threads, download_path, download_chunk
 		)
-	var opts := C3HTTPRequest.Options.new()
+	var opts := C3Http.Options.new()
 	opts.use_threads = trial.use_threads
 	if trial.use_session:
 		opts.session = session
@@ -248,7 +248,7 @@ func _time(
 		opts.download_file = download_path
 		opts.download_chunk_size = download_chunk
 	var start := Time.get_ticks_usec()
-	var res := await C3HTTPRequest.request(
+	var res := await C3Http.request(
 		url, _auth_headers, HTTPClient.METHOD_GET, "", opts
 	)
 	var elapsed := Time.get_ticks_usec() - start
@@ -375,7 +375,7 @@ func _print_environment() -> void:
 	var renderer := ProjectSettings.get_setting(
 		"rendering/renderer/rendering_method", "?"
 	) as String
-	_print("# C3HTTPRequest benchmark vs native HTTPRequest")
+	_print("# C3Http vs. HTTPRequest benchmark")
 	_print("```")
 	_print("commit %s" % _git_commit())
 	_print("Godot %s | %s | %s | %s renderer" % [
@@ -386,14 +386,14 @@ func _print_environment() -> void:
 		"All timing values are in milliseconds. Tables show medians; five-number summary follows each section."
 	)
 	_print("")
-	_print("| ID       | Description                                              |")
-	_print("| -------- | -------------------------------------------------------- |")
-	_print("| nat_coop | native HTTPRequest node, cooperative (default) polling   |")
-	_print("| c3_coop  | C3HTTPRequest, cooperative (default) polling             |")
-	_print("| c3s_coop | C3HTTPRequest, cooperative polling, session (keep-alive) |")
-	_print("| nat_thr  | native HTTPRequest node, threaded polling                |")
-	_print("| c3_thr   | C3HTTPRequest, threaded polling                          |")
-	_print("| c3s_thr  | C3HTTPRequest, threaded polling, session (keep-alive)    |")
+	_print("| ID       | Description                                         |")
+	_print("| -------- | --------------------------------------------------- |")
+	_print("| nat_coop | Native `HTTPRequest`, cooperative (default) polling |")
+	_print("| c3_coop  | C3Http, cooperative (default) polling               |")
+	_print("| c3s_coop | C3Http, cooperative polling, session (keep-alive)   |")
+	_print("| nat_thr  | Native `HTTPRequest`, threaded polling              |")
+	_print("| c3_thr   | C3Http, threaded polling                            |")
+	_print("| c3s_thr  | C3Http, threaded polling, session (keep-alive)      |")
 
 
 # Refreshes the on-screen status from the current _phase. With a trial given, a

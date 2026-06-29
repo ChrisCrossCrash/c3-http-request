@@ -87,17 +87,17 @@ class TestDownloadFileCleanup extends GutTest:
 
 	func test_timeout_removes_partial_download_file() -> void:
 		var url := _url()
-		var opts := C3HTTPRequest.Options.new()
+		var opts := C3Http.Options.new()
 		opts.download_file = _DOWNLOAD_PATH
 		opts.timeout = 0.2
-		var res: C3HTTPRequest.Response = await (
-			C3HTTPRequest
+		var res: C3Http.Response = await (
+			C3Http
 			. _Impl
 			. new()
 			.request(url, PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
 		)
 		assert_false(res.ok)
-		assert_eq(res.error.kind, C3HTTPRequest.RequestError.Kind.TIMEOUT)
+		assert_eq(res.error.kind, C3Http.RequestError.Kind.TIMEOUT)
 		assert_false(
 			FileAccess.file_exists(_DOWNLOAD_PATH),
 			"partial download file should be deleted on timeout"
@@ -105,8 +105,8 @@ class TestDownloadFileCleanup extends GutTest:
 
 	func test_cancellation_removes_partial_download_file() -> void:
 		var url := _url()
-		var token := C3HTTPRequest.CancellationToken.new()
-		var opts := C3HTTPRequest.Options.new()
+		var token := C3Http.CancellationToken.new()
+		var opts := C3Http.Options.new()
 		opts.download_file = _DOWNLOAD_PATH
 		opts.timeout = 5.0
 		opts.cancellation_token = token
@@ -114,14 +114,14 @@ class TestDownloadFileCleanup extends GutTest:
 		# exists, so the cancel path must clean it up.
 		opts.on_progress = func(_received: int, _total: int) -> void:
 			token.cancel()
-		var res: C3HTTPRequest.Response = await (
-			C3HTTPRequest
+		var res: C3Http.Response = await (
+			C3Http
 			. _Impl
 			. new()
 			.request(url, PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
 		)
 		assert_false(res.ok)
-		assert_eq(res.error.kind, C3HTTPRequest.RequestError.Kind.CANCELLED)
+		assert_eq(res.error.kind, C3Http.RequestError.Kind.CANCELLED)
 		assert_false(
 			FileAccess.file_exists(_DOWNLOAD_PATH),
 			"partial download file should be deleted on cancellation"
@@ -134,14 +134,14 @@ class TestDownloadFileCleanup extends GutTest:
 		# TEST-NET-1 (RFC 5737): guaranteed unroutable, so the connection stays pending
 		# (no DNS, no server, no completion), giving the poll loop a chance to yield once
 		# — where _CancelWhileConnectingImpl cancels.
-		var token := C3HTTPRequest.CancellationToken.new()
+		var token := C3Http.CancellationToken.new()
 		var impl := _CancelWhileConnectingImpl.new()
 		impl.token = token
-		var opts := C3HTTPRequest.Options.new()
+		var opts := C3Http.Options.new()
 		opts.download_file = _DOWNLOAD_PATH
 		opts.cancellation_token = token
 		opts.timeout = 5.0  # safety net; the cancel fires on the first poll yield
-		var res: C3HTTPRequest.Response = await impl.request(
+		var res: C3Http.Response = await impl.request(
 			"http://192.0.2.1/",
 			PackedStringArray(),
 			HTTPClient.METHOD_GET,
@@ -149,7 +149,7 @@ class TestDownloadFileCleanup extends GutTest:
 			opts
 		)
 		assert_false(res.ok)
-		assert_eq(res.error.kind, C3HTTPRequest.RequestError.Kind.CANCELLED)
+		assert_eq(res.error.kind, C3Http.RequestError.Kind.CANCELLED)
 		assert_false(
 			FileAccess.file_exists(_DOWNLOAD_PATH),
 			"no download file should be created when the request aborts before the body phase"
@@ -158,8 +158,8 @@ class TestDownloadFileCleanup extends GutTest:
 	# Cancels its own request the first time the poll loop yields — i.e. while still
 	# connecting, before any response or body. Lets a test reach a pre-body early
 	# return deterministically, without depending on connection timing.
-	class _CancelWhileConnectingImpl extends C3HTTPRequest._Impl:
-		var token: C3HTTPRequest.CancellationToken
+	class _CancelWhileConnectingImpl extends C3Http._Impl:
+		var token: C3Http.CancellationToken
 
 		func _pump(tree: SceneTree, on_worker: bool) -> void:
 			token.cancel()

@@ -21,13 +21,13 @@ class TestSSEStream extends GutTest:
 		var port := _server.start("retry: 5000\n\n")
 		assert_ne(port, 0, "server failed to bind")
 
-		var opts := C3HTTPRequest.Options.new()
+		var opts := C3Http.Options.new()
 		opts.timeout = 0.5  # idle timeout: the server sends the retry block, then stalls
 		opts.on_sse_event = func(_data: String, _event_type: String, _id: String) -> void:
 			pass
 
-		var res: C3HTTPRequest.Response = await (
-			C3HTTPRequest
+		var res: C3Http.Response = await (
+			C3Http
 			._Impl
 			.new()
 			.request(
@@ -40,7 +40,7 @@ class TestSSEStream extends GutTest:
 		)
 
 		assert_false(res.ok, "a stalled stream should time out")
-		assert_eq(res.error.kind, C3HTTPRequest.RequestError.Kind.TIMEOUT)
+		assert_eq(res.error.kind, C3Http.RequestError.Kind.TIMEOUT)
 		assert_eq(res.sse_retry_ms, 5000, "the parsed retry: hint must survive the timeout")
 
 

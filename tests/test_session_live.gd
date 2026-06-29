@@ -231,24 +231,24 @@ class _KeepAliveServer:
 ## modes, and that methods unsafe to replay are not retried.
 class TestDropRetry extends GutTest:
 	var _drop: _DropServer
-	var _impl: C3HTTPRequest._Impl
+	var _impl: C3Http._Impl
 
 	func before_each() -> void:
 		_drop = _DropServer.new()
-		_impl = C3HTTPRequest._Impl.new()
+		_impl = C3Http._Impl.new()
 
 	func after_each() -> void:
 		_drop.stop()
 
 	# Seeds the session with one successful GET so the connection is pooled.
 	# Returns the session with the warmed pool entry, or null on seed failure.
-	func _seed(url: String, use_threads: bool) -> C3HTTPRequest.Session:
-		var session := C3HTTPRequest.Session.new()
-		var opts := C3HTTPRequest.Options.new()
+	func _seed(url: String, use_threads: bool) -> C3Http.Session:
+		var session := C3Http.Session.new()
+		var opts := C3Http.Options.new()
 		opts.session = session
 		opts.use_threads = use_threads
 		opts.timeout = 5.0
-		var seed: C3HTTPRequest.Response = await _impl.request(
+		var seed: C3Http.Response = await _impl.request(
 			url, PackedStringArray(), HTTPClient.METHOD_GET, "", opts
 		)
 		assert_true(seed.ok, "seed request must succeed: %s" % str(seed.error))
@@ -261,10 +261,10 @@ class TestDropRetry extends GutTest:
 		var url := "http://127.0.0.1:%d/ping/" % p
 		var session := await _seed(url, false)
 
-		var opts := C3HTTPRequest.Options.new()
+		var opts := C3Http.Options.new()
 		opts.session = session
 		opts.timeout = 5.0
-		var res: C3HTTPRequest.Response = await _impl.request(
+		var res: C3Http.Response = await _impl.request(
 			url, PackedStringArray(), HTTPClient.METHOD_GET, "", opts
 		)
 		assert_true(res.ok, "retried GET should succeed: %s" % str(res.error))
@@ -278,11 +278,11 @@ class TestDropRetry extends GutTest:
 		var url := "http://127.0.0.1:%d/ping/" % p
 		var session := await _seed(url, true)
 
-		var opts := C3HTTPRequest.Options.new()
+		var opts := C3Http.Options.new()
 		opts.session = session
 		opts.use_threads = true
 		opts.timeout = 5.0
-		var res: C3HTTPRequest.Response = await _impl.request(
+		var res: C3Http.Response = await _impl.request(
 			url, PackedStringArray(), HTTPClient.METHOD_GET, "", opts
 		)
 		assert_true(res.ok, "threaded retried GET should succeed: %s" % str(res.error))
@@ -296,10 +296,10 @@ class TestDropRetry extends GutTest:
 		# Seed with GET so a connection is pooled, then trigger with HEAD.
 		var session := await _seed(url, false)
 
-		var opts := C3HTTPRequest.Options.new()
+		var opts := C3Http.Options.new()
 		opts.session = session
 		opts.timeout = 5.0
-		var res: C3HTTPRequest.Response = await _impl.request(
+		var res: C3Http.Response = await _impl.request(
 			url, PackedStringArray(), HTTPClient.METHOD_HEAD, "", opts
 		)
 		assert_true(res.ok, "retried HEAD should succeed: %s" % str(res.error))
@@ -312,14 +312,14 @@ class TestDropRetry extends GutTest:
 		var url := "http://127.0.0.1:%d/ping/" % p
 		var session := await _seed(url, false)
 
-		var opts := C3HTTPRequest.Options.new()
+		var opts := C3Http.Options.new()
 		opts.session = session
 		opts.timeout = 5.0
-		var res: C3HTTPRequest.Response = await _impl.request(
+		var res: C3Http.Response = await _impl.request(
 			url, PackedStringArray(), HTTPClient.METHOD_POST, "body", opts
 		)
 		assert_false(res.ok, "POST on a dropped connection must not be retried")
-		assert_eq(res.error.kind, C3HTTPRequest.RequestError.Kind.TRANSPORT)
+		assert_eq(res.error.kind, C3Http.RequestError.Kind.TRANSPORT)
 
 	# Same gating check with use_threads=true.
 	func test_post_not_retried_threaded() -> void:
@@ -328,15 +328,15 @@ class TestDropRetry extends GutTest:
 		var url := "http://127.0.0.1:%d/ping/" % p
 		var session := await _seed(url, true)
 
-		var opts := C3HTTPRequest.Options.new()
+		var opts := C3Http.Options.new()
 		opts.session = session
 		opts.use_threads = true
 		opts.timeout = 5.0
-		var res: C3HTTPRequest.Response = await _impl.request(
+		var res: C3Http.Response = await _impl.request(
 			url, PackedStringArray(), HTTPClient.METHOD_POST, "body", opts
 		)
 		assert_false(res.ok, "threaded POST must not be retried")
-		assert_eq(res.error.kind, C3HTTPRequest.RequestError.Kind.TRANSPORT)
+		assert_eq(res.error.kind, C3Http.RequestError.Kind.TRANSPORT)
 
 	# An SSE GET on a dropped pooled connection is retried transparently, and the
 	# retry delivers exactly 3 events with no duplicates from the seed.
@@ -355,10 +355,10 @@ class TestDropRetry extends GutTest:
 		assert_ne(p, 0)
 		var url := "http://127.0.0.1:%d/sse/" % p
 
-		var session := C3HTTPRequest.Session.new()
+		var session := C3Http.Session.new()
 		# Seed: consume 3 events and pool the connection.
 		var seed_count := [0]
-		var seed_opts := C3HTTPRequest.Options.new()
+		var seed_opts := C3Http.Options.new()
 		seed_opts.session = session
 		seed_opts.timeout = 5.0
 		seed_opts.on_sse_event = func(
@@ -370,14 +370,14 @@ class TestDropRetry extends GutTest:
 
 		# Trigger: reuse → drop → retry → fresh connection → 3 events, no duplicates.
 		var retry_count := [0]
-		var opts := C3HTTPRequest.Options.new()
+		var opts := C3Http.Options.new()
 		opts.session = session
 		opts.timeout = 5.0
 		opts.on_sse_event = func(
 			_data: String, _type: String, _id: String
 		) -> void:
 			retry_count[0] += 1
-		var res: C3HTTPRequest.Response = await _impl.request(
+		var res: C3Http.Response = await _impl.request(
 			url, PackedStringArray(), HTTPClient.METHOD_GET, "", opts
 		)
 		assert_true(res.ok, "SSE retry should succeed: %s" % str(res.error))
@@ -394,11 +394,11 @@ class TestDropRetry extends GutTest:
 ## pooled requests (HEAD phantom bytes, 204, gzip, POST echo, concurrent).
 class TestKeepAliveReuse extends GutTest:
 	var _keep: _KeepAliveServer
-	var _impl: C3HTTPRequest._Impl
+	var _impl: C3Http._Impl
 
 	func before_each() -> void:
 		_keep = _KeepAliveServer.new()
-		_impl = C3HTTPRequest._Impl.new()
+		_impl = C3Http._Impl.new()
 
 	func after_each() -> void:
 		_keep.stop()
@@ -429,18 +429,18 @@ class TestKeepAliveReuse extends GutTest:
 		assert_ne(p, 0)
 		var base := "http://127.0.0.1:%d" % p
 
-		var session := C3HTTPRequest.Session.new()
-		var opts := C3HTTPRequest.Options.new()
+		var session := C3Http.Session.new()
+		var opts := C3Http.Options.new()
 		opts.session = session
 		opts.timeout = 5.0
 
-		var head_res: C3HTTPRequest.Response = await _impl.request(
+		var head_res: C3Http.Response = await _impl.request(
 			base + "/head/", PackedStringArray(), HTTPClient.METHOD_HEAD, "", opts
 		)
 		assert_true(head_res.ok, "HEAD should succeed")
 		assert_eq(head_res.status, 200)
 
-		var get_res: C3HTTPRequest.Response = await _impl.request(
+		var get_res: C3Http.Response = await _impl.request(
 			base + "/get/", PackedStringArray(), HTTPClient.METHOD_GET, "", opts
 		)
 		assert_true(get_res.ok, "GET after HEAD should succeed")
@@ -457,18 +457,18 @@ class TestKeepAliveReuse extends GutTest:
 		var p := _keep.start()
 		assert_ne(p, 0)
 		var url := "http://127.0.0.1:%d/204/" % p
-		var session := C3HTTPRequest.Session.new()
-		var opts := C3HTTPRequest.Options.new()
+		var session := C3Http.Session.new()
+		var opts := C3Http.Options.new()
 		opts.session = session
 		opts.timeout = 5.0
 
-		var r1: C3HTTPRequest.Response = await _impl.request(
+		var r1: C3Http.Response = await _impl.request(
 			url, PackedStringArray(), HTTPClient.METHOD_GET, "", opts
 		)
 		assert_true(r1.ok, "first 204 should succeed")
 		assert_eq(r1.status, 204)
 
-		var r2: C3HTTPRequest.Response = await _impl.request(
+		var r2: C3Http.Response = await _impl.request(
 			url, PackedStringArray(), HTTPClient.METHOD_GET, "", opts
 		)
 		assert_true(r2.ok, "second 204 on reused connection should succeed")
@@ -491,18 +491,18 @@ class TestKeepAliveReuse extends GutTest:
 		var p := _keep.start()
 		assert_ne(p, 0)
 		var url := "http://127.0.0.1:%d/echo/" % p
-		var session := C3HTTPRequest.Session.new()
-		var opts := C3HTTPRequest.Options.new()
+		var session := C3Http.Session.new()
+		var opts := C3Http.Options.new()
 		opts.session = session
 		opts.timeout = 5.0
 
-		var r1: C3HTTPRequest.Response = await _impl.request(
+		var r1: C3Http.Response = await _impl.request(
 			url, PackedStringArray(), HTTPClient.METHOD_POST, "hello", opts
 		)
 		assert_true(r1.ok, "first POST should succeed")
 		assert_eq(r1.text, "hello")
 
-		var r2: C3HTTPRequest.Response = await _impl.request(
+		var r2: C3Http.Response = await _impl.request(
 			url, PackedStringArray(), HTTPClient.METHOD_POST, "world", opts
 		)
 		assert_true(r2.ok, "second POST on reused connection should succeed")
@@ -537,20 +537,20 @@ class TestKeepAliveReuse extends GutTest:
 		var p := _keep.start()
 		assert_ne(p, 0)
 
-		var session := C3HTTPRequest.Session.new()
-		var opts := C3HTTPRequest.Options.new()
+		var session := C3Http.Session.new()
+		var opts := C3Http.Options.new()
 		opts.session = session
 		opts.timeout = 5.0
 
 		# Seed the pool: GET /ping/ → 200 "ok".
-		var seed_res: C3HTTPRequest.Response = await _impl.request(
+		var seed_res: C3Http.Response = await _impl.request(
 			"http://127.0.0.1:%d/ping/" % p,
 			PackedStringArray(), HTTPClient.METHOD_GET, "", opts
 		)
 		assert_true(seed_res.ok, "seed should succeed")
 
 		# Reuse: /redirect/ is served from the pooled connection → 302 → target.
-		var res: C3HTTPRequest.Response = await _impl.request(
+		var res: C3Http.Response = await _impl.request(
 			"http://127.0.0.1:%d/redirect/" % p,
 			PackedStringArray(), HTTPClient.METHOD_GET, "", opts
 		)
@@ -578,20 +578,20 @@ class TestKeepAliveReuse extends GutTest:
 		var p := _keep.start()
 		assert_ne(p, 0)
 		var url := "http://127.0.0.1:%d/gzip/" % p
-		var session := C3HTTPRequest.Session.new()
-		var opts := C3HTTPRequest.Options.new()
+		var session := C3Http.Session.new()
+		var opts := C3Http.Options.new()
 		opts.session = session
 		opts.accept_gzip = true
 		opts.timeout = 5.0
 
-		var r1: C3HTTPRequest.Response = await _impl.request(
+		var r1: C3Http.Response = await _impl.request(
 			url, PackedStringArray(["Accept-Encoding: gzip"]),
 			HTTPClient.METHOD_GET, "", opts
 		)
 		assert_true(r1.ok, "first gzip request should succeed")
 		assert_eq(r1.text, "hello")
 
-		var r2: C3HTTPRequest.Response = await _impl.request(
+		var r2: C3Http.Response = await _impl.request(
 			url, PackedStringArray(["Accept-Encoding: gzip"]),
 			HTTPClient.METHOD_GET, "", opts
 		)
@@ -611,7 +611,7 @@ class TestKeepAliveReuse extends GutTest:
 		assert_ne(p, 0)
 		var url := "http://127.0.0.1:%d/ping/" % p
 
-		var session := C3HTTPRequest.Session.new()
+		var session := C3Http.Session.new()
 		session.max_connections_per_host = 4
 
 		const N := 4
@@ -625,14 +625,14 @@ class TestKeepAliveReuse extends GutTest:
 
 	func _fire_one(
 		url: String,
-		session: C3HTTPRequest.Session,
+		session: C3Http.Session,
 		done: Array,
 		successes: Array,
 	) -> void:
-		var opts := C3HTTPRequest.Options.new()
+		var opts := C3Http.Options.new()
 		opts.session = session
 		opts.timeout = 5.0
-		var res: C3HTTPRequest.Response = await _impl.request(
+		var res: C3Http.Response = await _impl.request(
 			url, PackedStringArray(), HTTPClient.METHOD_GET, "", opts
 		)
 		if res.ok:
