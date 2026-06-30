@@ -484,7 +484,7 @@ class Session:
 ## var mock: C3Http.Mock
 ##
 ## func before_each() -> void:
-##     mock = C3Http.Mock.new()
+##     mock = C3Http.Mock.new(C3Http)
 ##     mock.install()
 ##
 ## func after_each() -> void:
@@ -516,14 +516,18 @@ class Mock extends _Impl:
 			return calls.back() if not calls.is_empty() else {}
 
 	var _stubs: Array = []
+	var _outer: GDScript
 
-	## Installs this mock as [code]C3Http._impl[/code].
+	func _init(outer: GDScript) -> void:
+		_outer = outer
+
+	## Installs this mock as the active implementation.
 	func install() -> void:
-		C3Http._impl = self
+		_outer._impl = self
 
 	## Uninstalls this mock and restores normal request behavior.
 	func uninstall() -> void:
-		C3Http._impl = _Impl.new()
+		_outer._impl = _Impl.new()
 
 	## Returns a stub builder for [param url]. Omit [param url] to create
 	## the catch-all default stub, matched when no URL-specific stub exists.

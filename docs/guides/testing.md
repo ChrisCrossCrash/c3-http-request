@@ -6,7 +6,7 @@
 var mock: C3Http.Mock
 
 func before_each() -> void:
-    mock = C3Http.Mock.new()
+    mock = C3Http.Mock.new(C3Http)
     mock.install()
 
 func after_each() -> void:
@@ -47,3 +47,22 @@ assert_eq(mock.last_call["method"], HTTPClient.METHOD_POST)
 ```
 
 `mock.reset()` clears the call log and all registered stubs without uninstalling — useful between sub-cases in the same test class.
+
+## Testing without a global class name
+
+Some addons comment out `class_name C3Http` to avoid polluting the global scope. In that case, load the script once into a local variable and use it everywhere `C3Http` would otherwise appear — including the `Mock.new()` call:
+
+```gdscript
+const C3Http := preload("res://addons/c3-http-request/c3_http_request/c3_http_request.gd")
+
+var mock  # C3Http.Mock — typed as Variant to avoid the class name at the declaration site
+
+func before_each() -> void:
+    mock = C3Http.Mock.new(C3Http)
+    mock.install()
+
+func after_each() -> void:
+    mock.uninstall()
+```
+
+`mock.install()` and `mock.uninstall()` take no arguments regardless — the script reference is captured once at construction time. Everything else (`mock.stub()`, `mock.calls`, `mock.reset()`) works identically.
