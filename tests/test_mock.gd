@@ -6,7 +6,7 @@ class TestMockLifecycle extends GutTest:
 	var mock: C3Http.Mock
 
 	func before_each() -> void:
-		mock = C3Http.Mock.new()
+		mock = C3Http.Mock.new(C3Http)
 
 	func after_each() -> void:
 		mock.uninstall()
@@ -31,7 +31,7 @@ class TestMockCallRecording extends GutTest:
 	var mock: C3Http.Mock
 
 	func before_each() -> void:
-		mock = C3Http.Mock.new()
+		mock = C3Http.Mock.new(C3Http)
 		mock.install()
 
 	func after_each() -> void:
@@ -101,7 +101,7 @@ class TestMockReset extends GutTest:
 	var mock: C3Http.Mock
 
 	func before_each() -> void:
-		mock = C3Http.Mock.new()
+		mock = C3Http.Mock.new(C3Http)
 		mock.install()
 
 	func after_each() -> void:
@@ -131,7 +131,7 @@ class TestStubOk extends GutTest:
 	var mock: C3Http.Mock
 
 	func before_each() -> void:
-		mock = C3Http.Mock.new()
+		mock = C3Http.Mock.new(C3Http)
 		mock.install()
 
 	func after_each() -> void:
@@ -171,7 +171,7 @@ class TestStubFail extends GutTest:
 	var mock: C3Http.Mock
 
 	func before_each() -> void:
-		mock = C3Http.Mock.new()
+		mock = C3Http.Mock.new(C3Http)
 		mock.install()
 
 	func after_each() -> void:
@@ -206,7 +206,7 @@ class TestStubReturns extends GutTest:
 	var mock: C3Http.Mock
 
 	func before_each() -> void:
-		mock = C3Http.Mock.new()
+		mock = C3Http.Mock.new(C3Http)
 		mock.install()
 
 	func after_each() -> void:
@@ -230,7 +230,7 @@ class TestStubMatching extends GutTest:
 	var mock: C3Http.Mock
 
 	func before_each() -> void:
-		mock = C3Http.Mock.new()
+		mock = C3Http.Mock.new(C3Http)
 		mock.install()
 
 	func after_each() -> void:
@@ -276,7 +276,7 @@ class TestMockIntegration extends GutTest:
 	var mock: C3Http.Mock
 
 	func before_each() -> void:
-		mock = C3Http.Mock.new()
+		mock = C3Http.Mock.new(C3Http)
 		mock.install()
 		mock.stub().ok({"result": "ok"})
 

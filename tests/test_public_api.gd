@@ -6,7 +6,7 @@ class TestRequest extends GutTest:
 	var mock: C3Http.Mock
 
 	func before_each() -> void:
-		mock = C3Http.Mock.new()
+		mock = C3Http.Mock.new(C3Http)
 		mock.install()
 
 	func after_each() -> void:
