@@ -4,25 +4,37 @@ description: Regenerate the API reference docs from GDScript source
 
 Generate (or update) the Markdown API reference in `docs/api/` by running both steps from the repo root.
 
-**Step 1** — extract XML documentation from GDScript source:
+**Step 1** — delete the old XML docs in `docs/xml/`:
+
+```
+rm -rf docs/xml/*
+```
+
+**Step 2** — extract XML documentation from GDScript source:
 
 ```
 godot --headless --path . --doctool docs/xml --gdscript-docs res://c3_http_request/
 ```
 
-**Step 2** — convert the XML to Markdown:
+**Step 3** — delete the old API reference in `docs/api/`:
 
 ```
-python scripts/generate_api_docs.py --outer-class C3Http
+rm -rf docs/api/*
 ```
 
-**Step 3** — verify the site builds without errors:
+**Step 4** — convert the XML to Markdown:
+
+```
+c3-godot-docs-gen docs/xml/ docs/api/
+```
+
+**Step 5** — verify the site builds without errors:
 
 ```
 mkdocs build --strict
 ```
 
-`--strict` promotes warnings (broken links, missing pages) to errors. After all three steps complete, inspect the generated files in `docs/api/` for correctness (types, cross-links, method signatures, descriptions), note any build warnings or errors, and report your findings.
+`--strict` promotes warnings (broken links, missing pages) to errors. After all steps complete, inspect the generated files in `docs/api/` for correctness (types, cross-links, method signatures, descriptions), note any build warnings or errors, and report your findings.
 
 > [!NOTE]
 > `mkdocs build` will always print a warning block from the Material for MkDocs team about upcoming MkDocs 2.0 breaking changes. This is expected and can be ignored — it is not a build error.

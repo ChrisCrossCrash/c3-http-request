@@ -130,7 +130,7 @@ var res3 := await C3Http.request(url, PackedStringArray(), HTTPClient.METHOD_GET
 | `error`        | `RequestError`      | Error details when `ok` is `false`; `null` otherwise.                                                                               |
 | `sse_retry_ms` | `int`               | Server's last SSE `retry:` value (reconnect backoff, ms), or `-1` if none / not an SSE stream. See [SSE guide](docs/guides/sse.md). |
 
-See the [Response reference](docs/api/response.md) for full details.
+See the [Response reference](docs/api/C3Http.Response.md) for full details.
 
 ## Options
 
@@ -154,7 +154,7 @@ See the [Response reference](docs/api/response.md) for full details.
 | `on_status_changed`   | `Callable`          | empty   | When set, invoke `(status)` each time the `HTTPClient` status changes. See [Connection status](docs/guides/connection-status.md).                                                                                                      |
 | `session`             | `Session`           | `null`  | Connection pool for HTTP keep-alive reuse. `null` opens a fresh connection per call. See [Sessions (Keep-Alive)](docs/guides/sessions.md).                                                                                             |
 
-See the [Options reference](docs/api/options.md) for full details.
+See the [Options reference](docs/api/C3Http.Options.md) for full details.
 
 ## Error handling
 
@@ -171,7 +171,7 @@ When `res.ok` is `false`, `res.error` is a `RequestError` describing what went w
 
 `str(error)` produces a compact one-line summary: `[transport] Could not connect.` or `[http] status=404 Request failed with status 404.`
 
-See the [Errors reference](docs/api/requesterror.md) for full details.
+See the [Errors reference](docs/api/C3Http.RequestError.md) for full details.
 
 ## Cancellation
 

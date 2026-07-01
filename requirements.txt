@@ -1,0 +1,1 @@
+c3-godot-docs-gen==0.3.0

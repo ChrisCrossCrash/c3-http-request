@@ -36,7 +36,7 @@ opts.timeout = 10.0
 var res3 := await C3Http.request(url, PackedStringArray(), HTTPClient.METHOD_GET, "", opts)
 ```
 
-Redirects are followed automatically (up to [`Options.max_redirects`](api/options.md#property-max_redirects)), so `res` reflects the final response the chain lands on.
+Redirects are followed automatically (up to [`Options.max_redirects`](api/C3Http.Options.md#property-max_redirects)), so `res` reflects the final response the chain lands on.
 
 ## Signature
 
