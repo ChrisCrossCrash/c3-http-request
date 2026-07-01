@@ -2,8 +2,6 @@
 
 `C3Http` is a lightweight nodeless replacement for [`HTTPRequest`](https://docs.godotengine.org/en/stable/classes/class_httprequest.html). It offers significant improvements in ergonomics, performance, and testability.
 
-**[Full documentation](https://chriscrosscrash.github.io/c3-http-request/)**
-
 Here is a complete working example of how to use `C3Http` in a script:
 
 ```gdscript
