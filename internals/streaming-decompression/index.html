@@ -1,0 +1,1382 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://chriscrosscrash.github.io/c3-http-request/internals/streaming-decompression/">
+      
+      
+        <link rel="prev" href="../../guides/threaded-requests/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Streaming gzip decompression - C3 HTTP Request</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#streaming-gzip-decompression" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="C3 HTTP Request" class="md-header__button md-logo" aria-label="C3 HTTP Request" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            C3 HTTP Request
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Streaming gzip decompression
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ChrisCrossCrash/c3-http-request" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ChrisCrossCrash/c3-http-request
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="C3 HTTP Request" class="md-nav__button md-logo" aria-label="C3 HTTP Request" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    C3 HTTP Request
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ChrisCrossCrash/c3-http-request" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ChrisCrossCrash/c3-http-request
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C3 HTTP Request (C3Http)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C3Http Benchmark
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Api
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Api
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/C3Http.CancellationToken/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C3Http.CancellationToken
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/C3Http.Mock/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C3Http.Mock
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/C3Http.Options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C3Http.Options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/C3Http.RequestError/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C3Http.RequestError
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/C3Http.Response/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C3Http.Response
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/C3Http.Session/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C3Http.Session
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/c3http/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C3Http
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/cancellation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cancellation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/connection-status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connection Status
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/download-progress/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Download Progress
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/sessions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sessions (HTTP Keep-Alive)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/sse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Server-Sent Events (SSE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/threaded-requests/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threaded Requests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Internals
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Internals
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streaming gzip decompression
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streaming gzip decompression
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-streampeergzip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why StreamPeerGZIP
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-complication-a-small-fixed-buffer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The complication: a small, fixed buffer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-feed-and-drain-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The feed-and-drain loop
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-two-early-exits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The two early exits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-the-body-loop-uses-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the body loop uses it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#caveats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Caveats
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-streampeergzip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why StreamPeerGZIP
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-complication-a-small-fixed-buffer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The complication: a small, fixed buffer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-feed-and-drain-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The feed-and-drain loop
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-two-early-exits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The two early exits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-the-body-loop-uses-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the body loop uses it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#caveats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Caveats
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="streaming-gzip-decompression">Streaming gzip decompression</h1>
+<p>Decompressing a gzip-compressed response <strong>as it streams to disk</strong> — handling each piece as it arrives off the network rather than waiting for the whole body and decompressing it in one shot — is the most involved thing <code>C3Http</code> does internally. Doing it correctly means working around a couple of non-obvious traps, which makes the code hard to follow by reading it top to bottom, so it gets its own explainer here. Only the <strong>file-download</strong> path actually decodes incrementally like this. The <strong>in-memory</strong> path does not stream its decompression — it collects the whole body first and decodes it in one pass at the end — but it reuses the very same decompressor to do so, for reasons the next section explains. So one engine (<code>StreamPeerGZIP</code>) serves both ways a body can come back; only the file path is driven by it chunk-by-chunk as bytes arrive.</p>
+<p>This page builds the picture from the ground up: what makes file downloads different, the Godot tool we lean on (<code>StreamPeerGZIP</code>), the feed-and-drain loop at the heart of it, and the safety checks around it. The code lives in <code>_Impl.execute()</code>, the in-memory entry point <code>_maybe_decompress_body()</code>, and the shared helpers <code>_decode_chunk()</code> / <code>_drain_decoder()</code> in <a href="https://github.com/ChrisCrossCrash/c3-http-request/blob/main/c3_http_request/c3_http_request.gd"><code>c3_http_request.gd</code></a>.</p>
+<h2 id="the-problem">The problem</h2>
+<p>A response body can come back to you two ways:</p>
+<ul>
+<li><strong>In memory</strong> — the body is collected into one <code>PackedByteArray</code> and handed back as <code>Response.body</code>. Simple, but the entire body sits in RAM.</li>
+<li><strong>To a file</strong> — when <code>Options.download_file</code> is set, each piece is written to disk as it arrives and <code>Response.body</code> is left empty. This is how you download something too big to comfortably hold in memory.</li>
+</ul>
+<p>Now add compression. To save bandwidth, a server can send the body compressed and set a <code>Content-Encoding: gzip</code> header to say so. We want to hand you the <em>decompressed</em> content, so what lands on disk is the real file, not a compressed blob. (We handle <code>gzip</code> only — see the Caveats for why <code>deflate</code> is intentionally left out.)</p>
+<p>The file path is what makes this hard. A file download exists precisely to handle bodies too big for RAM, so decompressing one in a single shot — holding the <strong>entire</strong> compressed body and producing the <strong>entire</strong> decompressed body at once — would defeat the purpose; a 2 GB download would blow up memory. So the file path needs <strong>streaming</strong> decompression: decompress the data in small pieces as it arrives off the network, write each decompressed piece to disk, and never keep more than a small working set in memory at once.</p>
+<p>An in-memory response doesn't have that memory constraint — the whole body is already being collected into RAM, so you might expect it to skip the streaming machinery and decompress in one shot with <code>PackedByteArray.decompress_dynamic()</code>. We deliberately don't, and the reason isn't "we've already built the streaming path, so we may as well reuse it." It's that <code>decompress_dynamic()</code> is impossible to use correctly here. Its binding returns a <code>PackedByteArray</code>, and an <strong>empty</strong> result is all you get back for three completely different outcomes: a body that validly decompressed to nothing, a body that blew past the size limit, and a body that was corrupt. There's no error code, no way to tell them apart. So a legitimately empty gzipped body — which servers really do send — is indistinguishable from a failure, and you're forced to either reject valid empty bodies or wave through corrupt ones.</p>
+<p><code>StreamPeerGZIP</code> has no such ambiguity: feeding bytes in and draining them out reports decode errors distinctly from a validly empty result, so an empty body and a corrupt one are never confused. That's why the in-memory path feeds its fully-collected body through the <strong>same</strong> streaming decompressor as a single chunk, rather than taking the one-shot shortcut. Both paths run on one engine — <code>StreamPeerGZIP</code> driven by <code>_decode_chunk()</code> — and behave identically, right down to how they treat an empty or corrupt body. The rest of this page describes that shared engine; the only difference between the two callers is that the file path drains each decompressed piece to disk as chunks arrive, while the in-memory path hands the whole body in at the end.</p>
+<h2 id="why-streampeergzip">Why <code>StreamPeerGZIP</code></h2>
+<p>Godot already ships a tool for exactly this: <a href="https://docs.godotengine.org/en/stable/classes/class_streampeergzip.html"><code>StreamPeerGZIP</code></a>. You feed it compressed bytes and it hands back decompressed bytes incrementally — a little in, a little out — so you never need the whole thing at once. We let it do the actual gzip math (it wraps zlib, the library that implements DEFLATE — the compression algorithm gzip is built on) rather than implementing decompression ourselves.</p>
+<p>It's the same class Godot's own <a href="https://docs.godotengine.org/en/stable/classes/class_httprequest.html"><code>HTTPRequest</code></a> node uses internally for this job, and its API hasn't changed since Godot 4.0 across the versions this addon supports. The docs mark it "experimental," which means its API could change in a future release — that's worth watching. The <code>TestStreamingDecompression</code> tests exercise it directly, so any API breakage on a new Godot version will surface as test failures rather than silent misbehavior.</p>
+<p>We create one <code>StreamPeerGZIP</code> per download, in decompression mode — but only when the caller has opted into compression via <code>accept_gzip</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">func</span><span class="w"> </span><span class="n">_make_download_decoder</span><span class="p">(</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="n">resp_headers</span><span class="p">:</span><span class="w"> </span><span class="nb nb-Type">PackedStringArray</span><span class="p">,</span><span class="w"> </span><span class="n">accept_gzip</span><span class="p">:</span><span class="w"> </span><span class="nb nb-Type">bool</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">StreamPeerGZIP</span><span class="p">:</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="ow">not</span><span class="w"> </span><span class="n">accept_gzip</span><span class="p">:</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nb nb-Type">null</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="n">_header_value</span><span class="p">(</span><span class="n">resp_headers</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Content-Encoding&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">to_lower</span><span class="p">()</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="s2">&quot;gzip&quot;</span><span class="p">:</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nb nb-Type">null</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="k">var</span><span class="w"> </span><span class="n">decoder</span><span class="w"> </span><span class="p">:</span><span class="o">=</span><span class="w"> </span><span class="n">StreamPeerGZIP</span><span class="o">.</span><span class="n">new</span><span class="p">()</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="n">decoder</span><span class="o">.</span><span class="n">start_decompression</span><span class="p">(</span><span class="bp">false</span><span class="p">)</span><span class="w">   </span><span class="c1"># false = gzip</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">decoder</span>
+</code></pre></div>
+<p>The decision is <strong>gated on <code>accept_gzip</code></strong>, matching <code>HTTPRequest</code> — but it's worth being precise about what that option actually does, because the name is a little misleading.</p>
+<p><code>accept_gzip</code> controls two things together: whether we send an <code>Accept-Encoding: gzip</code> request header, and whether we decode a compressed response. When it's true, we advertise a preference for compression, which nudges servers that are on the fence to compress and save bandwidth; then, if the response comes back compressed, we decode it. When it's false, we send no <code>Accept-Encoding</code> at all and perform no decoding — the body is handed back exactly as received.</p>
+<p>The misleading part: <code>accept_gzip = false</code> does <strong>not</strong> mean "I refuse gzip." Omitting <code>Accept-Encoding</code> tells the server any encoding is acceptable, so a server is still free to return a compressed body. What changes is only what we do with it — the raw bytes come through verbatim, and the <code>Content-Encoding</code> header in <code>Response.headers</code> tells you what encoding they are. If you specifically want to forbid compression, set <code>Accept-Encoding: identity</code> in <code>custom_headers</code> (which takes precedence over ours when <code>accept_gzip</code> is true).</p>
+<p>When <code>accept_gzip</code> is true, we decode the response only when <code>Content-Encoding</code> is <code>gzip</code>. Anything else — including <code>deflate</code> — gets no decoder, and the chunks pass through unchanged. The in-memory path (<code>_maybe_decompress_body</code>) shares both this gating and the very same <code>StreamPeerGZIP</code> decoder: it feeds the whole collected body through <code>_decode_chunk</code> as one chunk, so the two paths behave identically — right down to how they handle an empty or corrupt body. (This is also how <code>HTTPRequest</code> decodes every response; it never uses the one-shot <code>PackedByteArray.decompress_dynamic</code>, whose binding can't tell a validly-empty body apart from an over-limit or corrupt one.)</p>
+<h2 id="the-complication-a-small-fixed-buffer">The complication: a small, fixed buffer</h2>
+<p>Almost all the complexity below comes from one detail. <code>StreamPeerGZIP</code> holds its decompressed output in a small, fixed-size internal buffer — about 64 KB — until you read it back out. (Internally it's a <em>ring buffer</em>, also called a circular FIFO: a fixed block of memory the decoder fills while you empty it, with both ends wrapping around. The "fixed size" is the part that matters here.)</p>
+<p>Picture the decoder as a box, with compressed bytes going in one side and decompressed bytes coming out the other:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a> compressed bytes                                   decompressed bytes
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a> (chunk.slice(pos))   ┌──────────────────────────┐  (get_partial_data)
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a> ──put_partial_data──▶│  zlib inflate → 64 KB box│──get_partial_data──▶ to disk
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>                      │  (fixed size)            │
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>                      └──────────────────────────┘
+</code></pre></div>
+<p>Here's the rub: that buffer is small and fixed, but decompression can <em>expand</em> data enormously. A 64 KB compressed chunk can easily decompress to many megabytes. So you can't just push a whole chunk in and expect all the output to fit, and you can't assume a single read pulls out everything it produced.</p>
+<p>Two things the API tells you make this workable:</p>
+<ul>
+<li><strong><code>put_partial_data(data)</code> returns <code>[err, sent]</code></strong> — <code>sent</code> is how many <em>compressed</em> bytes the decoder actually accepted. If its output box fills up partway through, it takes less than you offered and reports the smaller number. This is <strong>back-pressure</strong>: the decoder saying "I'm full — empty me before I'll take more."</li>
+<li><strong><code>get_partial_data(n)</code> returns <code>[err, part]</code></strong> — this reads decompressed bytes back out. An empty <code>part</code> means the box is empty for now.</li>
+</ul>
+<p>(Don't confuse this 64 KB output box with <code>Options.download_chunk_size</code>. That option controls how many <em>compressed</em> bytes we read off the network per poll; it has nothing to do with the decoder's internal buffer.)</p>
+<h2 id="the-feed-and-drain-loop">The feed-and-drain loop</h2>
+<p>Each compressed chunk that arrives is handed to <code>_decode_chunk()</code>. It pushes the chunk in and pulls decompressed bytes out, repeating until the whole chunk has been accepted:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">func</span><span class="w"> </span><span class="n">_decode_chunk</span><span class="p">(</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="n">decoder</span><span class="p">:</span><span class="w"> </span><span class="n">StreamPeerGZIP</span><span class="p">,</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="n">chunk</span><span class="p">:</span><span class="w"> </span><span class="nb nb-Type">PackedByteArray</span><span class="p">,</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="n">read_size</span><span class="p">:</span><span class="w"> </span><span class="nb nb-Type">int</span><span class="p">,</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="n">budget</span><span class="p">:</span><span class="w"> </span><span class="nb nb-Type">int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="mi">1</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="nb nb-Type">Dictionary</span><span class="p">:</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="k">var</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="p">:</span><span class="o">=</span><span class="w"> </span><span class="nb nb-Type">PackedByteArray</span><span class="p">()</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="k">var</span><span class="w"> </span><span class="n">pos</span><span class="w"> </span><span class="p">:</span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="n">pos</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">chunk</span><span class="o">.</span><span class="n">size</span><span class="p">():</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">        </span><span class="k">var</span><span class="w"> </span><span class="n">fed</span><span class="p">:</span><span class="w"> </span><span class="nb nb-Type">Array</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">decoder</span><span class="o">.</span><span class="n">put_partial_data</span><span class="p">(</span><span class="n">chunk</span><span class="o">.</span><span class="n">slice</span><span class="p">(</span><span class="n">pos</span><span class="p">))</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">        </span><span class="k">var</span><span class="w"> </span><span class="n">feed_error</span><span class="p">:</span><span class="w"> </span><span class="n">Error</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fed</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">        </span><span class="k">var</span><span class="w"> </span><span class="n">sent</span><span class="p">:</span><span class="w"> </span><span class="nb nb-Type">int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fed</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="n">feed_error</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">OK</span><span class="p">:</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="s2">&quot;ok&quot;</span><span class="p">:</span><span class="w"> </span><span class="bp">false</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="n">out</span><span class="p">}</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">        </span><span class="n">pos</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">sent</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">        </span><span class="k">var</span><span class="w"> </span><span class="n">drained</span><span class="w"> </span><span class="p">:</span><span class="o">=</span><span class="w"> </span><span class="n">_drain_decoder</span><span class="p">(</span><span class="n">decoder</span><span class="p">,</span><span class="w"> </span><span class="n">read_size</span><span class="p">)</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">        </span><span class="n">out</span><span class="o">.</span><span class="n">append_array</span><span class="p">(</span><span class="n">drained</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">])</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="ow">not</span><span class="w"> </span><span class="n">drained</span><span class="p">[</span><span class="s2">&quot;ok&quot;</span><span class="p">]:</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="s2">&quot;ok&quot;</span><span class="p">:</span><span class="w"> </span><span class="bp">false</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="n">out</span><span class="p">}</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="n">budget</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="ow">and</span><span class="w"> </span><span class="n">out</span><span class="o">.</span><span class="n">size</span><span class="p">()</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">budget</span><span class="p">:</span>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="w">            </span><span class="c1"># Past the allowance — stop; the caller will reject this as over-limit.</span>
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="w">            </span><span class="k">break</span>
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="n">sent</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="ow">and</span><span class="w"> </span><span class="p">(</span><span class="n">drained</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">]</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nb nb-Type">PackedByteArray</span><span class="p">)</span><span class="o">.</span><span class="n">is_empty</span><span class="p">():</span>
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a><span class="w">            </span><span class="c1"># No input consumed and nothing decoded means no further progress is</span>
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a><span class="w">            </span><span class="c1"># possible (e.g. trailing bytes past the stream end) — stop spinning.</span>
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a><span class="w">            </span><span class="k">break</span>
+<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="s2">&quot;ok&quot;</span><span class="p">:</span><span class="w"> </span><span class="bp">true</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="n">out</span><span class="p">}</span>
+</code></pre></div>
+<p>The key detail is <strong><code>pos += sent</code>, not <code>pos += chunk.size()</code></strong>. Because the decoder's output box can fill before it has accepted the whole chunk, a single <code>put_partial_data</code> may only take part of it. The loop keeps re-feeding whatever's left over after each drain frees up room. So a 64 KB compressed chunk that expands to 60 MB is handled in waves — feed a little, drain it out to disk, feed more, drain again — and we never hold more than roughly one box's worth at a time instead of all 60 MB.</p>
+<p>Draining is just a small loop that reads decompressed bytes until the box is empty:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">func</span><span class="w"> </span><span class="n">_drain_decoder</span><span class="p">(</span><span class="n">decoder</span><span class="p">:</span><span class="w"> </span><span class="n">StreamPeerGZIP</span><span class="p">,</span><span class="w"> </span><span class="n">read_size</span><span class="p">:</span><span class="w"> </span><span class="nb nb-Type">int</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="nb nb-Type">Dictionary</span><span class="p">:</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="k">var</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="p">:</span><span class="o">=</span><span class="w"> </span><span class="nb nb-Type">PackedByteArray</span><span class="p">()</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="bp">true</span><span class="p">:</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">        </span><span class="k">var</span><span class="w"> </span><span class="n">result</span><span class="p">:</span><span class="w"> </span><span class="nb nb-Type">Array</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">decoder</span><span class="o">.</span><span class="n">get_partial_data</span><span class="p">(</span><span class="n">read_size</span><span class="p">)</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">        </span><span class="k">var</span><span class="w"> </span><span class="n">drain_error</span><span class="p">:</span><span class="w"> </span><span class="n">Error</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">result</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">        </span><span class="k">var</span><span class="w"> </span><span class="n">part</span><span class="p">:</span><span class="w"> </span><span class="nb nb-Type">PackedByteArray</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">result</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="n">drain_error</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">OK</span><span class="p">:</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="s2">&quot;ok&quot;</span><span class="p">:</span><span class="w"> </span><span class="bp">false</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="n">out</span><span class="p">}</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="n">part</span><span class="o">.</span><span class="n">is_empty</span><span class="p">():</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">            </span><span class="k">break</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">        </span><span class="n">out</span><span class="o">.</span><span class="n">append_array</span><span class="p">(</span><span class="n">part</span><span class="p">)</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="s2">&quot;ok&quot;</span><span class="p">:</span><span class="w"> </span><span class="bp">true</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="n">out</span><span class="p">}</span>
+</code></pre></div>
+<h2 id="the-two-early-exits">The two early exits</h2>
+<p>The feed loop has two extra <code>break</code>s, and each guards against a specific failure:</p>
+<ul>
+<li><strong>Stopping a "zip bomb."</strong> A zip bomb is a tiny compressed file crafted to explode into a huge amount of data when decompressed — a few kilobytes becoming many gigabytes. <code>budget</code> is how many more bytes we're still allowed to produce (the <code>body_size_limit</code> minus what's already been written to disk). The moment the decompressed output passes that, we stop — rather than dutifully unpacking the rest of a bomb into memory. Because we check after each drain, the overshoot is at most about one box's worth. A negative <code>budget</code> means no limit was set, so this check is skipped.</li>
+<li><strong>No-progress guard.</strong> If a feed accepts nothing (<code>sent == 0</code>) <em>and</em> the drain produces nothing either, there's no way to move forward — this happens when the gzip stream has officially ended but a few stray bytes remain after it (a concatenated second gzip member, or junk appended after the stream). Without this check the loop would spin forever. We break cleanly instead. The trade-off is that a valid multi-member gzip stream is truncated at the first member rather than decoded in full (see Caveats) — but it never hangs.</li>
+</ul>
+<h2 id="how-the-body-loop-uses-it">How the body loop uses it</h2>
+<p>Back in the main download loop, the file branch decompresses each chunk (when there's a decoder), checks the size limit, and writes the result to disk:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">if</span><span class="w"> </span><span class="n">file</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="nb nb-Type">null</span><span class="p">:</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span><span class="k">var</span><span class="w"> </span><span class="n">to_write</span><span class="w"> </span><span class="p">:</span><span class="o">=</span><span class="w"> </span><span class="n">chunk</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="n">download_decoder</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="nb nb-Type">null</span><span class="p">:</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">        </span><span class="k">var</span><span class="w"> </span><span class="n">budget</span><span class="w"> </span><span class="p">:</span><span class="o">=</span><span class="w"> </span><span class="p">(</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">            </span><span class="n">options</span><span class="o">.</span><span class="n">body_size_limit</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">bytes_written</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="n">options</span><span class="o">.</span><span class="n">body_size_limit</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">            </span><span class="k">else</span><span class="w"> </span><span class="o">-</span><span class="mi">1</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">        </span><span class="p">)</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">        </span><span class="k">var</span><span class="w"> </span><span class="n">decoded</span><span class="w"> </span><span class="p">:</span><span class="o">=</span><span class="w"> </span><span class="n">_decode_chunk</span><span class="p">(</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">            </span><span class="n">download_decoder</span><span class="p">,</span><span class="w"> </span><span class="n">chunk</span><span class="p">,</span><span class="w"> </span><span class="n">options</span><span class="o">.</span><span class="n">download_chunk_size</span><span class="p">,</span><span class="w"> </span><span class="n">budget</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">        </span><span class="p">)</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="ow">not</span><span class="w"> </span><span class="n">decoded</span><span class="p">[</span><span class="s2">&quot;ok&quot;</span><span class="p">]:</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">            </span><span class="n">file</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="w">            </span><span class="n">DirAccess</span><span class="o">.</span><span class="n">remove_absolute</span><span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">download_file</span><span class="p">)</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="n">_fail</span><span class="p">(</span><span class="n">RequestError</span><span class="o">.</span><span class="n">transport</span><span class="p">(</span><span class="s2">&quot;Failed to decompress download stream.&quot;</span><span class="p">))</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="w">        </span><span class="n">to_write</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">decoded</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">]</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="w">        </span><span class="n">options</span><span class="o">.</span><span class="n">body_size_limit</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="w">        </span><span class="ow">and</span><span class="w"> </span><span class="n">bytes_written</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">to_write</span><span class="o">.</span><span class="n">size</span><span class="p">()</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">options</span><span class="o">.</span><span class="n">body_size_limit</span>
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a><span class="w">    </span><span class="p">):</span>
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a><span class="w">        </span><span class="n">file</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a><span class="w">        </span><span class="n">DirAccess</span><span class="o">.</span><span class="n">remove_absolute</span><span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">download_file</span><span class="p">)</span>
+<a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">_fail</span><span class="p">(</span><span class="n">RequestError</span><span class="o">.</span><span class="n">body_size_limit_exceeded</span><span class="p">(</span>
+<a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a><span class="w">            </span><span class="s2">&quot;Response body exceeded limit of </span><span class="si">%d</span><span class="s2"> bytes.&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="n">options</span><span class="o">.</span><span class="n">body_size_limit</span>
+<a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a><span class="w">        </span><span class="p">))</span>
+<a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a><span class="w">    </span><span class="n">file</span><span class="o">.</span><span class="n">store_buffer</span><span class="p">(</span><span class="n">to_write</span><span class="p">)</span>
+<a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a><span class="w">    </span><span class="n">bytes_written</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">to_write</span><span class="o">.</span><span class="n">size</span><span class="p">()</span>
+</code></pre></div>
+<p>Three things worth highlighting:</p>
+<ul>
+<li><strong><code>body_size_limit</code> counts decompressed bytes here.</strong> It's checked against <code>bytes_written</code> — the bytes that actually land on disk — which is what truly bounds a zip bomb, since the compressed size could be tiny. This matches <code>HTTPRequest</code>. (The in-memory path additionally bounds the <em>compressed</em> received bytes as they stream in, then caps the decompressed output through the same <code>_decode_chunk</code> budget; that extra compressed-bytes check is the deliberate, unchanged difference between the two paths.)</li>
+<li><strong>Errors clean up the partial file.</strong> On a decode failure or a size-limit breach, the file is closed and deleted, so a half-written or corrupt download is never left behind. A decode failure surfaces as a <code>TRANSPORT</code> error; a size breach as <code>BODY_SIZE_LIMIT_EXCEEDED</code>.</li>
+<li><strong>A failed download fails cleanly.</strong> Bytes are already on disk by the time a later chunk fails to decode, so there's nothing to fall back to — the file is removed and the request errors. The in-memory path now mirrors this: a corrupt body returns a <code>TRANSPORT</code> error rather than passing the raw bytes through, so neither path ever silently hands back undecoded data.</li>
+</ul>
+<h2 id="caveats">Caveats</h2>
+<ul>
+<li><strong><code>deflate</code> is intentionally unsupported.</strong> We advertise <code>Accept-Encoding: gzip</code> only, never <code>deflate</code>, and we don't decode a <code>Content-Encoding: deflate</code> response — the raw bytes pass through unchanged. This is deliberate. HTTP <code>deflate</code> is <a href="https://www.zlib.net/zlib_faq.html#faq39">ambiguous</a>: it's supposed to be zlib-wrapped (<a href="https://datatracker.ietf.org/doc/html/rfc1950">RFC 1950</a>), but many servers send raw deflate (<a href="https://datatracker.ietf.org/doc/html/rfc1951">RFC 1951</a>, no zlib header or adler32 trailer) instead, and the two can't be told apart with certainty — Godot exposes no raw-inflate primitive, so the only way to accept raw deflate is a header sniff that's still ~1-in-1000 wrong. Native <code>HTTPRequest</code> assumes zlib-wrapped and silently fails on raw deflate, a rare and hard-to-trace bug. Rather than inherit it or paper over it, we skip deflate entirely — gzip dominates the web, brotli is next, and <code>deflate</code> is a rounding error. (<a href="https://github.com/golang/go/blob/fd6f414c65e61a51cf12c98ef473957d73f97c44/src/net/http/transport.go#L3003-L3005">Go's <code>net/http</code></a> makes the same gzip-only choice for the same reason — its source comment reads "Deflate is ambiguous and not as universally supported anyway" and cites this same zlib FAQ.) A caller who genuinely needs deflate can request it via <code>custom_headers</code> and decode the raw bytes themselves.</li>
+<li><strong>Multi-member gzip is truncated.</strong> RFC 1952 allows a gzip stream to be several members concatenated, and a fully compliant decoder decodes all of them. <code>StreamPeerGZIP</code> stops at the first member's end and doesn't reset for the next, so we decode only the first member and drop the rest — without raising an error. This is rare over HTTP (servers almost always send a single member), and the no-progress guard means we truncate cleanly rather than hang. Decoding all members would require detecting the leftover bytes and continuing them through a fresh decoder.</li>
+<li><strong>SSE is never decompressed.</strong> When a streaming <code>on_sse_event</code> sink is active, the body is parsed as a <code>text/event-stream</code> and no decoder is created.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "search.highlight", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

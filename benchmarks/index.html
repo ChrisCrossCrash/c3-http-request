@@ -1,0 +1,1795 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://chriscrosscrash.github.io/c3-http-request/benchmarks/">
+      
+      
+        <link rel="prev" href="..">
+      
+      
+        <link rel="next" href="../quick-start/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>C3Http Benchmark - C3 HTTP Request</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#c3http-benchmark" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="C3 HTTP Request" class="md-header__button md-logo" aria-label="C3 HTTP Request" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            C3 HTTP Request
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              C3Http Benchmark
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ChrisCrossCrash/c3-http-request" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ChrisCrossCrash/c3-http-request
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="C3 HTTP Request" class="md-nav__button md-logo" aria-label="C3 HTTP Request" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    C3 HTTP Request
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ChrisCrossCrash/c3-http-request" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ChrisCrossCrash/c3-http-request
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C3 HTTP Request (C3Http)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C3Http Benchmark
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C3Http Benchmark
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#latency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Latency
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Latency">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#methodology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Methodology
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Analysis
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#small-download-tcp-slow-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Small Download (TCP Slow-Start)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Small Download (TCP Slow-Start)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#background-the-congestion-window-and-iw10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Background: the congestion window and IW10
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#methodology_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Methodology
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#results_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#analysis_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Analysis
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#file-download" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File Download
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="File Download">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#methodology_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Methodology
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#results_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#analysis_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Analysis
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Api
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Api
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/C3Http.CancellationToken/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C3Http.CancellationToken
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/C3Http.Mock/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C3Http.Mock
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/C3Http.Options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C3Http.Options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/C3Http.RequestError/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C3Http.RequestError
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/C3Http.Response/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C3Http.Response
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/C3Http.Session/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C3Http.Session
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/c3http/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C3Http
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/cancellation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cancellation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/connection-status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connection Status
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/download-progress/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Download Progress
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/sessions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sessions (HTTP Keep-Alive)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/sse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Server-Sent Events (SSE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/threaded-requests/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threaded Requests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Internals
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Internals
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../internals/streaming-decompression/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streaming gzip decompression
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#latency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Latency
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Latency">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#methodology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Methodology
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Analysis
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#small-download-tcp-slow-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Small Download (TCP Slow-Start)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Small Download (TCP Slow-Start)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#background-the-congestion-window-and-iw10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Background: the congestion window and IW10
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#methodology_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Methodology
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#results_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#analysis_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Analysis
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#file-download" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File Download
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="File Download">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#methodology_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Methodology
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#results_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#analysis_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Analysis
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="c3http-benchmark">C3Http Benchmark</h1>
+<p>This analysis compares <code>C3Http</code> against Godot's <a href="https://docs.godotengine.org/en/4.7/classes/class_httprequest.html"><code>HTTPRequest</code></a> node across three scenarios: single-request latency, small downloads (TCP slow-start behavior), and large file downloads. The results are from a run of the <a href="https://github.com/ChrisCrossCrash/c3-http-request/blob/main/examples/benchmark/benchmark.gd"><code>examples/benchmark/benchmark.gd</code></a> script, which generated the results in <a href="https://github.com/ChrisCrossCrash/c3-http-request/blob/main/BENCHMARK.md"><code>BENCHMARK.md</code></a>.</p>
+<p>Both clients are built on the same transport: Godot's <a href="https://docs.godotengine.org/en/4.7/classes/class_httpclient.html"><code>HTTPClient</code></a>, a non-blocking state machine you drive by calling <code>poll()</code> repeatedly to advance it through its stages — resolving the host, connecting, sending the request, then reading the response body one chunk at a time. Neither client blocks a thread waiting on the network; instead each runs a <strong>polling loop</strong> that calls <code>poll()</code> over and over until the response is complete. One of the important design consideration regarding speed for each client is <em>how often, and on which thread, that loop gets to run.</em></p>
+<p>Each scenario tests two polling modes. In <strong>cooperative</strong> mode (the default for both clients), the polling loop yields back to the scene tree whenever it has to wait, resuming on the next frame — so the frame rate bounds how often it can resume to make progress. How much work each client does within a single resume varies, and that is exactly where the two differ on downloads, below. This cadence ties timing to the frame rate throughout, so the latency scenario varies the frame cap directly (uncapped, 120, 60, and 30 fps) to isolate its effect. In <strong>threaded</strong> mode, the request runs on a background thread that polls at OS speed, decoupling it from the frame rate entirely. Each client opts in through its own setting: <code>Options.use_threads = true</code> for <code>C3Http</code>, and <code>HTTPRequest</code>'s own <code>use_threads</code> property. The tables below report both modes for each client side by side. Every section also includes a <code>C3Http</code> "session" variant that passes a shared <code>Session</code> object via <code>Options.session</code>, reusing the existing TLS/TCP connection across requests instead of opening a new one each time.</p>
+<p><strong>Test environment:</strong></p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Machine</td>
+<td>AMD Ryzen 5 7600, Windows 11</td>
+</tr>
+<tr>
+<td>Godot</td>
+<td>4.7-stable (official)</td>
+</tr>
+<tr>
+<td>Renderer</td>
+<td>forward_plus (Vulkan), NVIDIA GeForce RTX 4070</td>
+</tr>
+<tr>
+<td>Server</td>
+<td>Django/Daphne/Nginx on Amazon Lightsail (Ubuntu, 2 vCPUs, 512 MB RAM, Virginia Zone A) — <a href="https://github.com/ChrisCrossCrash/chriskumm.com_django/blob/5c287dc02169d61a161ea12264c9641892b9dea5/benchmark/views.py">source</a></td>
+</tr>
+<tr>
+<td>Server TCP</td>
+<td>BBR congestion control, fq qdisc, <code>tcp_slow_start_after_idle=0</code></td>
+</tr>
+<tr>
+<td>Benchmark script</td>
+<td><a href="https://github.com/ChrisCrossCrash/c3-http-request/blob/main/examples/benchmark/"><code>examples/benchmark/</code></a></td>
+</tr>
+<tr>
+<td>Run command</td>
+<td><code>godot --path . --no-debug examples/benchmark/benchmark.tscn</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>[!NOTE]
+To prevent abuse, the server requires an API key for all requests. However, a <a href="https://github.com/ChrisCrossCrash/c3-http-request/blob/main/examples/benchmark/benchmark_server.py">Python script</a> is included, which will run a benchmark-compatible server locally on your own machine. To use it, change the <code>SERVER_BASE</code> constant in <a href="https://github.com/ChrisCrossCrash/c3-http-request/blob/main/examples/benchmark/benchmark.gd"><code>benchmark.gd</code></a> to point to <code>http://127.0.0.1:8927</code>, then run the Python script in a separate terminal before running the benchmark. The results will differ significantly from the published numbers due to the local connection, but the relative performance of the clients should be similar.</p>
+</blockquote>
+<p>All results are medians, so a request occasionally slowed by system noise doesn't skew the numbers. The client machine was in Minneapolis, MN; the server in Virginia (AWS us-east-1), roughly 1,300 miles away. All timing values are in milliseconds. The following table defines the labels used in the results tables below.</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>nat_coop</td>
+<td>Native <code>HTTPRequest</code>, cooperative (default) polling</td>
+</tr>
+<tr>
+<td>c3_coop</td>
+<td><code>C3Http</code>, cooperative (default) polling</td>
+</tr>
+<tr>
+<td>c3s_coop</td>
+<td><code>C3Http</code>, cooperative polling, session (keep-alive)</td>
+</tr>
+<tr>
+<td>nat_thr</td>
+<td>Native <code>HTTPRequest</code>, threaded polling</td>
+</tr>
+<tr>
+<td>c3_thr</td>
+<td><code>C3Http</code>, threaded polling</td>
+</tr>
+<tr>
+<td>c3s_thr</td>
+<td><code>C3Http</code>, threaded polling, session (keep-alive)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="latency">Latency</h2>
+<h3 id="methodology">Methodology</h3>
+<p>25 requests per variant, interleaved across variants so any slow drift in machine load is spread evenly. Warmup requests (not counted) prime the connection and DNS cache beforehand. Sweep runs at four frame caps: uncapped, 120 fps, 60 fps, and 30 fps.</p>
+<h3 id="results">Results</h3>
+<table>
+<thead>
+<tr>
+<th>Frame rate</th>
+<th>nat_coop</th>
+<th>c3_coop</th>
+<th>c3s_coop</th>
+<th>nat_thr</th>
+<th>c3_thr</th>
+<th>c3s_thr</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>uncapped</td>
+<td>162.1</td>
+<td>162.9</td>
+<td>33.5</td>
+<td>165.7</td>
+<td>163.6</td>
+<td>34.5</td>
+</tr>
+<tr>
+<td>120 fps</td>
+<td>183.3</td>
+<td>174.9</td>
+<td>41.7</td>
+<td>166.6</td>
+<td>166.5</td>
+<td>41.5</td>
+</tr>
+<tr>
+<td>60 fps</td>
+<td>200.0</td>
+<td>183.3</td>
+<td>50.0</td>
+<td>166.6</td>
+<td>166.5</td>
+<td>49.8</td>
+</tr>
+<tr>
+<td>30 fps</td>
+<td>233.3</td>
+<td>199.9</td>
+<td>66.7</td>
+<td>166.6</td>
+<td>166.5</td>
+<td>66.5</td>
+</tr>
+</tbody>
+</table>
+<h3 id="analysis">Analysis</h3>
+<p><strong>The baseline is ~162–166 ms.</strong> Running uncapped removes per-frame polling overhead, leaving just the network round-trip time. Both clients land in the same ~162–166 ms band — confirming this is a network constant, not a code difference.</p>
+<p><strong>Threaded mode is nearly flat across frame caps.</strong> Both clients sit at ~162–166 ms uncapped and ~166.5 ms at every capped rate — they do <em>not</em> climb with the frame cap the way cooperative mode does (compare native cooperative's 183 → 200 → 233 ms). The request runs on a background thread that completes the whole connection (resolve, connect, send, receive) in one shot at network speed, ~162 ms. The only frame-dependent cost left is delivery: the finished result is handed back to the awaiting main-thread coroutine on the next <code>process_frame</code>, so the measured time is the true network time rounded <em>up</em> to the next frame boundary — at most one frame of overhead. That all three capped rates land on the same ~166.5 ms is a coincidence of the caps chosen: ~162 ms rounds up to 20 frames at 120 fps, 10 frames at 60 fps, and 5 frames at 30 fps, and all three products fall at ~166.7 ms. Unlike cooperative mode, threaded mode never accumulates per-frame polling latency, so it stays flat instead of rising as the cap drops.</p>
+<p><strong>In cooperative mode, <code>C3Http</code> resolves ~1 frame sooner than native.</strong> The difference between <code>C3Http</code> and <code>HTTPRequest</code> at each capped rate matches almost exactly one additional frame period:</p>
+<ul>
+<li>120 fps (8.3 ms/frame): <code>HTTPRequest</code> is 8.4 ms slower than <code>C3Http</code> — one frame</li>
+<li>60 fps (16.7 ms/frame): <code>HTTPRequest</code> is 16.7 ms slower than <code>C3Http</code> — one frame</li>
+<li>30 fps (33.3 ms/frame): <code>HTTPRequest</code> is 33.4 ms slower than <code>C3Http</code> — one frame</li>
+</ul>
+<p><code>HTTPRequest</code> burns one extra frame per request, regardless of frame rate, because of how its polling loop is structured. <code>HTTPRequest</code> runs one iteration of a <code>switch (client-&gt;get_status())</code> per frame, in <a href="https://github.com/godotengine/godot/blob/4.7-stable/scene/main/http_request.cpp#L415-L420"><code>scene/main/http_request.cpp</code></a>. When <code>client-&gt;poll()</code> advances the status, that transition isn't acted on until the <em>next</em> frame, when the switch is evaluated again. The <code>STATUS_REQUESTING</code> case shows it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">case</span><span class="w"> </span><span class="no">HTTPClient</span><span class="o">::</span><span class="no">STATUS_REQUESTING</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="n">client</span><span class="o">-&gt;</span><span class="n">poll</span><span class="p">();</span><span class="w">   </span><span class="c1">// headers may arrive here → status becomes STATUS_BODY</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span><span class="w">     </span><span class="c1">// but we&#39;ve already branched; bail and come back next frame</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="p">}</span><span class="w"> </span><span class="k">break</span><span class="p">;</span>
+</code></pre></div>
+<p>On the frame the headers arrive, <code>poll()</code> moves the client to <code>STATUS_BODY</code>, but the switch has already committed to the <code>STATUS_REQUESTING</code> branch, so it returns and waits. Only on the following frame does the switch re-read the status, fall into the <code>STATUS_BODY</code> case, and read the response. The status was updated one frame before it was checked.</p>
+<p><code>C3Http</code> re-reads the status in the same loop iteration, right after polling, and proceeds without yielding the moment the request phase ends:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">while</span><span class="w"> </span><span class="bp">true</span><span class="p">:</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="n">client</span><span class="o">.</span><span class="n">poll</span><span class="p">()</span><span class="w">                                        </span><span class="c1"># → STATUS_BODY</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="n">client</span><span class="o">.</span><span class="n">get_status</span><span class="p">()</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">HTTPClient</span><span class="o">.</span><span class="n">STATUS_REQUESTING</span><span class="p">:</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">        </span><span class="k">break</span><span class="w">                                            </span><span class="c1"># proceed this frame, no yield</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="o">...</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="n">await</span><span class="w"> </span><span class="n">_pump</span><span class="p">(</span><span class="n">tree</span><span class="p">,</span><span class="w"> </span><span class="n">_on_worker</span><span class="p">)</span>
+</code></pre></div>
+<p>So a status transition that costs native a frame costs <code>C3Http</code> nothing. This is the same mechanism at every status boundary; the <code>STATUS_REQUESTING</code> → <code>STATUS_BODY</code> transition is the one that lands inside the measured window. At a capped frame rate, <code>Options.use_threads = true</code> eliminates this overhead for both clients.</p>
+<p><strong><code>C3Http</code> (session) eliminates connection-establishment overhead entirely.</strong> When <code>Options.session</code> is set to a shared <code>Session</code> object, <code>C3Http</code> reuses the existing TLS/TCP connection instead of opening a new one. The warmup requests pre-fill the session's connection pool so each timed call finds a ready connection. Measured times drop to 33–67 ms across frame caps — compared to 162–233 ms without a session — eliminating roughly 125 ms of TCP and TLS handshake overhead per request. Session latency still grows with lower frame caps (the main-thread coroutine still waits on <code>process_frame</code>), but the absolute numbers are so small that even at 30 fps the time is under 70 ms. Cooperative and threaded are within 2 ms of each other at every cap, since the connection-setup time that threading could overlap is already gone.</p>
+<hr />
+<h2 id="small-download-tcp-slow-start">Small Download (TCP Slow-Start)</h2>
+<h3 id="background-the-congestion-window-and-iw10">Background: the congestion window and IW10</h3>
+<p>When a TCP connection opens, it has no idea how much bandwidth the path can absorb. Flooding it immediately would risk swamping a slow link and triggering packet loss, so TCP starts cautiously and ramps up. The limit on how much unacknowledged data the sender may have in flight at any moment is the <strong>congestion window</strong> (cwnd). A fresh connection begins at the <strong>initial congestion window</strong>, which by modern default (RFC 6928) is 10 segments — commonly called <strong>IW10</strong>, about <strong>14.6 KB</strong> (10 × the ~1460-byte maximum segment size). The server may send up to that much, then must wait for the client's acknowledgement — one network round trip (RTT) — before it is allowed to send more. Each successful round trip roughly doubles the window (this ramp is <em>slow start</em>), so the connection climbs toward the path's real capacity over several RTTs.</p>
+<p>Two consequences drive this benchmark:</p>
+<ul>
+<li>A payload that fits inside IW10 (≲ 14.6 KB) is delivered in a <strong>single</strong> post-handshake round trip. A larger one needs <strong>additional</strong> round trips while the window grows.</li>
+<li>A connection that has already carried traffic — a warm <code>Session</code> — has an enlarged window and skips the ramp entirely. (The benchmark server is configured with <code>net.ipv4.tcp_slow_start_after_idle=0</code>, so an idle keep-alive connection does not reset its window between requests; the warm-session advantage persists across gaps.)</li>
+</ul>
+<p>This section picks three sizes to straddle that threshold: <strong>10 KB</strong> (fits in IW10), <strong>20 KB</strong> (just over it, so a fresh connection needs one extra RTT), and <strong>400 KB</strong> (far past it, so a fresh connection climbs slow start over several RTTs).</p>
+<h3 id="methodology_1">Methodology</h3>
+<p>Download a body of the stated size, median of 25 runs per variant, at 60 fps. A single <code>Session</code> is shared across all three sizes so its window is fully warmed by the time the larger rows run. Warmup runs (not counted) precede timing.</p>
+<h3 id="results_1">Results</h3>
+<table>
+<thead>
+<tr>
+<th>Body size</th>
+<th>nat_coop</th>
+<th>c3_coop</th>
+<th>c3s_coop</th>
+<th>nat_thr</th>
+<th>c3_thr</th>
+<th>c3s_thr</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10 KB</td>
+<td>200.0</td>
+<td>183.3</td>
+<td>50.0</td>
+<td>183.2</td>
+<td>183.1</td>
+<td>49.8</td>
+</tr>
+<tr>
+<td>20 KB</td>
+<td>200.0</td>
+<td>199.9</td>
+<td>50.0</td>
+<td>199.8</td>
+<td>199.9</td>
+<td>49.8</td>
+</tr>
+<tr>
+<td>400 KB</td>
+<td>333.4</td>
+<td>300.1</td>
+<td>51.1</td>
+<td>299.8</td>
+<td>299.6</td>
+<td>65.4</td>
+</tr>
+</tbody>
+</table>
+<h3 id="analysis_1">Analysis</h3>
+<p><strong>10 KB fits in one window, but a body adds one frame in threaded mode.</strong> At 10 KB the fresh-connection cooperative times match the single-request latency baseline — C3 cooperative 183 ms (vs. 183 ms for an empty ping at 60 fps), native 200 ms. The whole body arrives in the first congestion window, in a single round trip, so there is nothing to pay beyond the handshake and one RTT. Threaded mode tells a slightly different story: both clients land at ~183 ms rather than the ~166.5 ms threaded baseline from the latency section — one extra frame at 60 fps. Reading the 10 KB body on the background thread adds a small amount of CPU time that, for this particular network latency and frame rate, is enough to push the thread's completion past a frame boundary, delaying delivery by one <code>process_frame</code>. The spread revealed in the five-number summaries in <a href="https://github.com/ChrisCrossCrash/c3-http-request/blob/main/BENCHMARK.md#small-download-slow-start-control-vs-straddled-iw10">BENCHMARK.md</a> confirms this is a borderline boundary effect rather than a fixed cost: the fastest threaded runs dip to ~166 ms (min 166.4 ms for C3, 166.5 ms for native), one frame below the 183 ms median — on those runs the read finished just early enough to make the earlier frame.</p>
+<p><strong>20 KB crosses IW10, so a fresh connection pays an extra round trip.</strong> Bumping the body just past ~14.6 KB forces the server to stop after the first window and wait for an ACK before sending the rest. On fresh connections that extra round trip shows up as one or two added frames — C3 cooperative rises 183 → 200 ms, native stays at 200 ms (it was already a frame behind), and threaded jumps 183 → 200 ms. <strong>The warm session does not move at all: 50 ms at both 10 KB and 20 KB.</strong> Its window is already far larger than 20 KB, so the entire body still goes out in one round trip. This is the crux of the scenario — the slow-start penalty is a property of <em>fresh</em> connections, and a <code>Session</code> erases it.</p>
+<p>The five-number summaries show how clean this step is. In cooperative mode the Q1–Q3 spread is under 1 ms at every size, because each time is quantized to a whole number of frames (183.3 ms is 11 frames at 60 fps; 200.0 ms is 12). The slow-start penalty is therefore a discrete jump between frame counts, not an average of scattered samples. The one revealing outlier is c3s_coop at 20 KB: a 50 ms median against a max of 200.0 ms — exactly the fresh-connection cost — consistent with a single run that found no warm connection in the pool and paid the full handshake and slow-start it normally skips.</p>
+<p><strong>400 KB makes the gap dramatic.</strong> A body this large forces a fresh connection up the slow-start ramp over several round trips: C3 cooperative 300 ms, native 333 ms, ~300 ms threaded. The warm session delivers the same 400 KB in <strong>51 ms</strong> — barely more than its 10 KB time — because its window grew past 400 KB many requests ago. Here the session saves ~249 ms over a fresh cooperative connection, all of it handshake and slow-start overhead that never has to happen.</p>
+<hr />
+<h2 id="file-download">File Download</h2>
+<h3 id="methodology_2">Methodology</h3>
+<p>Stream a body to disk using a 64 KB chunk size (<code>Options.download_chunk_size</code>). Median of 25 runs per variant, at 60 fps. A warmup run (not counted) runs before timing begins. Body sizes: 1 MB, 8 MB, 32 MB.</p>
+<h3 id="results_2">Results</h3>
+<table>
+<thead>
+<tr>
+<th>Body size</th>
+<th>nat_coop</th>
+<th>c3_coop</th>
+<th>c3s_coop</th>
+<th>nat_thr</th>
+<th>c3_thr</th>
+<th>c3s_thr</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1 MB</td>
+<td>500.1</td>
+<td>334.0</td>
+<td>67.6</td>
+<td>333.1</td>
+<td>332.5</td>
+<td>65.6</td>
+</tr>
+<tr>
+<td>8 MB</td>
+<td>2366.7</td>
+<td>486.5</td>
+<td>150.5</td>
+<td>549.8</td>
+<td>466.4</td>
+<td>164.2</td>
+</tr>
+<tr>
+<td>32 MB</td>
+<td>8799.7</td>
+<td>984.4</td>
+<td>534.8</td>
+<td>1334.6</td>
+<td>948.5</td>
+<td>561.5</td>
+</tr>
+</tbody>
+</table>
+<h3 id="analysis_2">Analysis</h3>
+<p><strong>Native cooperative throughput is capped by the frame rate.</strong> This is verifiable in the engine source, not just inferred from the numbers. In <a href="https://github.com/godotengine/godot/blob/4.7-stable/scene/main/http_request.cpp"><code>scene/main/http_request.cpp</code></a> (4.7-stable), the body-reading state in <code>_update_connection()</code> calls <code>client-&gt;read_response_body_chunk()</code> exactly once and then returns — there is no loop draining the socket within a single call:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">case</span><span class="w"> </span><span class="no">HTTPClient</span><span class="o">::</span><span class="no">STATUS_BODY</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="c1">// ...</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="n">client</span><span class="o">-&gt;</span><span class="n">poll</span><span class="p">();</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">client</span><span class="o">-&gt;</span><span class="n">get_status</span><span class="p">()</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">HTTPClient</span><span class="o">::</span><span class="n">STATUS_BODY</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="n">PackedByteArray</span><span class="w"> </span><span class="n">chunk</span><span class="p">;</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">decompressor</span><span class="p">.</span><span class="n">is_null</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">        </span><span class="c1">// Chunk can be read directly.</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">        </span><span class="n">chunk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">client</span><span class="o">-&gt;</span><span class="n">read_response_body_chunk</span><span class="p">();</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">        </span><span class="n">downloaded</span><span class="p">.</span><span class="n">add</span><span class="p">(</span><span class="n">chunk</span><span class="p">.</span><span class="n">size</span><span class="p">());</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">    </span><span class="c1">// ...</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="p">}</span><span class="w"> </span><span class="k">break</span><span class="p">;</span>
+</code></pre></div>
+<p>In cooperative mode <code>_update_connection()</code> runs once per frame (driven by <code>NOTIFICATION_INTERNAL_PROCESS</code>), so the node reads at most one chunk per frame. Each chunk is bounded by <code>download_chunk_size</code>, which the node passes straight to the client (<code>set_download_chunk_size()</code> → <code>client-&gt;set_read_chunk_size()</code>). The effective bandwidth ceiling is therefore <code>download_chunk_size × frame_rate</code>. At 60 fps with 65,536-byte chunks that is ~3.93 MB/s — regardless of how fast the connection actually delivers data. An 8 MB body therefore takes roughly 8 MB / 3.93 MB/s ≈ 2.04 s, which matches the measured 2.37 s closely (the remainder is the request round-trip plus disk writes). Since V-Sync ties the frame rate to the monitor's refresh rate, this ceiling is monitor-dependent: a 144 Hz monitor yields ~9.44 MB/s and a 240 Hz monitor ~15.73 MB/s — in other words, <strong>upgrading your monitor makes native cooperative downloads faster</strong>.</p>
+<p>The slowness was first reported in 2019 as <a href="https://github.com/godotengine/godot/issues/32807">godot#32807</a>, but note that the issue documents the <em>symptom</em> (slow downloads), not this mechanism. The maintainers attributed it to the small default <code>read_chunk_size</code> and resolved the issue by exposing <code>download_chunk_size</code> as a tunable, later raising its default to 64 KiB. That lifts the ceiling but does not remove the one-chunk-per-frame gate — which is the deeper cause, and which the verbatim source above shows is still present in 4.7-stable. (The per-frame structure was correctly identified by a commenter in that thread, but it was never the basis of the fix.) So the claim here rests on the engine source, not on the observed behavior. The one-chunk-per-frame gate was identified while building C3 HTTP Request and filed as <a href="https://github.com/godotengine/godot/issues/120425">godot#120425</a>; at the time of writing a fix PR is pending approval.</p>
+<p><strong><code>C3Http</code> drains all available chunks per frame in cooperative mode.</strong> It reads everything the connection delivers each frame, so its time tracks bandwidth rather than polling cadence — nearly 5× faster than native at 60 fps for an 8 MB body (487 ms vs. 2367 ms), and nearly 9× faster at 32 MB (984 ms vs. 8800 ms). The advantage already shows at 1 MB (334 ms vs. 500 ms): a 1 MB body is ~16 chunks, which at one chunk per frame is ~16 frames of gating that C3 collapses into far fewer. The two clients converge only once a body fits in a frame or two of chunks.</p>
+<p><strong>Threaded mode narrows the gap but does not fully close it.</strong> With <code>use_threads = true</code>, both clients poll at OS speed. At 8 MB, C3 threaded (466 ms) and native threaded (550 ms) are within ~84 ms — compared to the ~1,880 ms cooperative gap — but they do not converge. At 32 MB the threaded gap widens to ~386 ms (948 ms vs. 1,335 ms). C3's drain-all-chunks behavior retains a throughput advantage even without the per-frame gate.</p>
+<p><strong>The session is a substantial win at all body sizes.</strong> A warm <code>Session</code> connection skips TCP slow-start ramp-up and begins transferring at full window size immediately. The benefit is largest where handshake and slow-start are the dominant cost:</p>
+<ul>
+<li>1 MB: session ~68 ms vs. fresh ~334 ms — roughly 5× faster</li>
+<li>8 MB: session ~150 ms vs. fresh ~487 ms — roughly 3× faster</li>
+<li>32 MB: session ~535 ms vs. fresh ~984 ms — roughly 2× faster</li>
+</ul>
+<p>The advantage narrows as body size grows because the actual transfer time increasingly dominates over connection-setup overhead — at 32 MB the two are within a factor of 2 — but the session is faster at every size tested.</p>
+<hr />
+<h2 id="summary">Summary</h2>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th><code>C3Http</code> (session)</th>
+<th><code>C3Http</code></th>
+<th><code>HTTPRequest</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Latency (cooperative)</td>
+<td>~4–5× lower; eliminates handshake overhead</td>
+<td>~1 frame sooner at any capped rate</td>
+<td>baseline</td>
+</tr>
+<tr>
+<td>Latency (threaded)</td>
+<td>~35–67 ms</td>
+<td>flat ~166 ms; does not rise with cap</td>
+<td>flat ~166 ms; does not rise with cap</td>
+</tr>
+<tr>
+<td>20 KB download</td>
+<td>no extra RTT; window already past IW10</td>
+<td>+1 RTT past IW10</td>
+<td>+1 RTT past IW10</td>
+</tr>
+<tr>
+<td>400 KB download</td>
+<td>~51 ms</td>
+<td>~300 ms</td>
+<td>~333 ms</td>
+</tr>
+<tr>
+<td>8 MB download (cooperative)</td>
+<td>~150 ms</td>
+<td>~5× faster than native</td>
+<td>frame-rate-gated throughput ceiling</td>
+</tr>
+<tr>
+<td>8 MB download (threaded)</td>
+<td>~164 ms</td>
+<td>~84 ms faster than native</td>
+<td>baseline</td>
+</tr>
+<tr>
+<td>32 MB download (cooperative)</td>
+<td>~535 ms</td>
+<td>~9× faster than native</td>
+<td>frame-rate-gated throughput ceiling</td>
+</tr>
+<tr>
+<td>32 MB download (threaded)</td>
+<td>~562 ms</td>
+<td>~386 ms faster than native</td>
+<td>baseline</td>
+</tr>
+</tbody>
+</table>
+<p>For minimum latency, <code>Options.session</code> with a shared <code>Session</code> object is the strongest lever — it eliminates handshake and TCP slow-start overhead entirely, cutting round-trip time by ~125 ms per request when the connection is already established. The session advantage holds at every transfer size tested, though it narrows as body size grows and raw throughput dominates over connection-setup time. For large cooperative downloads, <code>C3Http</code> is the only option that doesn't hit the per-frame chunk ceiling; <code>Options.use_threads = true</code> substantially closes the gap for <code>HTTPRequest</code>, but <code>C3Http</code> retains a throughput edge even in threaded mode at larger body sizes.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "search.highlight", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
