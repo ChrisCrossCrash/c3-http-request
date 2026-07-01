@@ -2,8 +2,8 @@ class_name C3Http
 ## General-purpose async HTTP client that requires no scene tree.
 ##
 ## Call the static [method request] from anywhere — no [Node] to add or
-## configure. Every call [code]await[/code]s a [Response] carrying
-## [member Response.ok] as a single failure check that covers transport
+## configure. Every call [code]await[/code]s a [C3Http.Response] carrying
+## [member C3Http.Response.ok] as a single failure check that covers transport
 ## errors, timeouts, and non-2xx statuses alike.
 
 ## The installed version of this addon, e.g. for logging or feature gating.
@@ -21,7 +21,7 @@ func _init() -> void:
 
 ## Sends an HTTP request to [param url] and returns the response. [br]
 ## [param custom_headers] are sent alongside any headers injected by
-## [member Options.accept_gzip]. [br]
+## [member C3Http.Options.accept_gzip]. [br]
 ## [param method] is an [enum HTTPClient.Method] value; defaults to
 ## [code]METHOD_GET[/code]. [br]
 ## [param request_data] is the raw request body string. [br]
@@ -74,7 +74,7 @@ class Options:
 	var download_chunk_size: int = 65536
 	## When [code]true[/code], sends [code]Accept-Encoding: gzip[/code]
 	## and decompresses the response body automatically. Applies to
-	## [member download_file] downloads too: compressed bytes are streamed through
+	## [member C3Http.Options.download_file] downloads too: compressed bytes are streamed through
 	## the decompressor straight to disk, so the file holds the decoded content.
 	## [br][br]
 	## When [code]false[/code], no [code]Accept-Encoding[/code] header is sent and
@@ -108,8 +108,8 @@ class Options:
 	## [code]await[/code] API is unchanged, and this falls back to the cooperative
 	## loop on export templates without thread support.
 	## [br][br]
-	## The [member on_sse_event], [member on_progress], and
-	## [member on_status_changed] callbacks are automatically marshaled back to the
+	## The [member C3Http.Options.on_sse_event], [member C3Http.Options.on_progress], and
+	## [member C3Http.Options.on_status_changed] callbacks are automatically marshaled back to the
 	## main thread, so they stay safe to touch the scene tree. Marshaling uses
 	## [code]call_deferred[/code], which would normally let a callback run on a
 	## [i]later[/i] frame — but this client drains all pending callbacks before the
@@ -133,17 +133,17 @@ class Options:
 	## [/codeblock]
 	var use_threads: bool = false
 	## Path to write the response body to on disk. When non-empty,
-	## [member Response.body] is empty and the data is in the file. The file is
+	## [member C3Http.Response.body] is empty and the data is in the file. The file is
 	## created only once the response body starts arriving, so a request that fails
 	## while resolving, connecting, or sending leaves the path untouched — never
 	## truncating an existing file it will not fill. If the transfer fails after
 	## writing has begun (timeout, cancellation, a decode error, or exceeding
-	## [member body_size_limit]), the partial file is removed.
+	## [member C3Http.Options.body_size_limit]), the partial file is removed.
 	var download_file: String = ""
 	## TLS options for HTTPS connections. [code]null[/code] uses
 	## [method TLSOptions.client] (validates the server certificate). Override
 	## with [method TLSOptions.client_unsafe] for self-signed certificates. [br][br]
-	## If you set a [member session], leaving this [code]null[/code] (the default)
+	## If you set a [member C3Http.Options.session], leaving this [code]null[/code] (the default)
 	## needs no extra thought — pooling just works. But if you [i]do[/i] set a
 	## custom [TLSOptions], you must reuse the same instance for every call that
 	## shares the session: connections are pooled by this object's identity, so a
@@ -152,17 +152,17 @@ class Options:
 	var tls_options: TLSOptions = null
 	## Host of an HTTP proxy to route plain [code]http://[/code] requests through.
 	## Empty means a direct connection for HTTP. Has no effect on [code]https://[/code]
-	## requests — set [member https_proxy_host] for those.
+	## requests — set [member C3Http.Options.https_proxy_host] for those.
 	var http_proxy_host: String = ""
-	## Port of the proxy named by [member http_proxy_host]. Ignored when
-	## [member http_proxy_host] is empty.
+	## Port of the proxy named by [member C3Http.Options.http_proxy_host]. Ignored when
+	## [member C3Http.Options.http_proxy_host] is empty.
 	var http_proxy_port: int = -1
 	## Host of an HTTPS proxy to tunnel [code]https://[/code] requests through.
 	## Empty means a direct connection for HTTPS. Has no effect on [code]http://[/code]
-	## requests — set [member http_proxy_host] for those.
+	## requests — set [member C3Http.Options.http_proxy_host] for those.
 	var https_proxy_host: String = ""
-	## Port of the proxy named by [member https_proxy_host]. Ignored when
-	## [member https_proxy_host] is empty.
+	## Port of the proxy named by [member C3Http.Options.https_proxy_host]. Ignored when
+	## [member C3Http.Options.https_proxy_host] is empty.
 	var https_proxy_port: int = -1
 	## Token for cancelling this request from another coroutine or signal
 	## handler. [code]null[/code] means no cancellation support.
@@ -173,15 +173,15 @@ class Options:
 	## current [code]id:[/code] cursor: it persists across events per the SSE spec,
 	## so an event with no [code]id:[/code] line still reports the most recent one
 	## (echo it as a [code]Last-Event-ID[/code] header to resume after a drop; see
-	## also [member Response.sse_retry_ms] for the suggested backoff). When set,
+	## also [member C3Http.Response.sse_retry_ms] for the suggested backoff). When set,
 	## a 2xx response body is parsed as an SSE stream rather than collected:
-	## [member Response.body] stays empty and [method C3Http.request]
-	## resolves only when the stream closes (use [member cancellation_token] to
-	## stop it early). While streaming, [member accept_gzip] and
-	## [member download_file] are ignored, and [member timeout] becomes an idle
+	## [member C3Http.Response.body] stays empty and [method C3Http.request]
+	## resolves only when the stream closes (use [member C3Http.Options.cancellation_token] to
+	## stop it early). While streaming, [member C3Http.Options.accept_gzip] and
+	## [member C3Http.Options.download_file] are ignored, and [member C3Http.Options.timeout] becomes an idle
 	## timeout (maximum seconds between events) rather than a total deadline. A
-	## non-2xx response is collected normally, so [member Response.ok],
-	## [member Response.error], and the error body still work as usual. Both LF
+	## non-2xx response is collected normally, so [member C3Http.Response.ok],
+	## [member C3Http.Response.error], and the error body still work as usual. Both LF
 	## ([code]\n\n[/code]) and CRLF ([code]\r\n\r\n[/code]) event delimiters are
 	## supported.
 	var on_sse_event: Callable = Callable()
@@ -190,9 +190,9 @@ class Options:
 	## [code]bytes_received[/code] is the cumulative byte count;
 	## [code]total_bytes[/code] is the [code]Content-Length[/code], or
 	## [code]-1[/code] when unknown (e.g. a chunked response). Fires once per
-	## non-empty chunk for both in-memory and [member download_file] downloads.
-	## Has no effect in SSE mode (see [member on_sse_event]), where
-	## [member on_sse_event] is the incremental signal instead.
+	## non-empty chunk for both in-memory and [member C3Http.Options.download_file] downloads.
+	## Has no effect in SSE mode (see [member C3Http.Options.on_sse_event]), where
+	## [member C3Http.Options.on_sse_event] is the incremental signal instead.
 	var on_progress: Callable = Callable()
 	## Optional [Callable] invoked as the underlying connection advances, as
 	## [code]on_status_changed.call(status: HTTPClient.Status)[/code] — one of
@@ -201,18 +201,18 @@ class Options:
 	## [code]STATUS_BODY[/code], etc. Fires once per change, in every mode
 	## (including SSE), and repeats the cycle for each hop when redirects are
 	## followed. Purely observational: the request's outcome is still reported via
-	## the returned [Response]. Very brief intermediate states may be coalesced.
+	## the returned [C3Http.Response]. Very brief intermediate states may be coalesced.
 	var on_status_changed: Callable = Callable()
-	## Optional [Session] for HTTP keep-alive connection reuse. When set, idle
+	## Optional [C3Http.Session] for HTTP keep-alive connection reuse. When set, idle
 	## connections to the same host are pooled and reused across calls, reducing
 	## latency for repeated requests to the same endpoint. [br][br]
 	## [code]null[/code] (the default) disables pooling: each call opens a fresh
-	## connection. Create a [Session] once and share it across calls that target
+	## connection. Create a [C3Http.Session] once and share it across calls that target
 	## the same set of hosts. [br][br]
-	## If you also set a custom [member tls_options], share that one [TLSOptions]
+	## If you also set a custom [member C3Http.Options.tls_options], share that one [TLSOptions]
 	## instance across the pooled calls too, or connection reuse is defeated. The
-	## default [code]null[/code] [member tls_options] needs no such care. See
-	## [member tls_options].
+	## default [code]null[/code] [member C3Http.Options.tls_options] needs no such care. See
+	## [member C3Http.Options.tls_options].
 	var session: Session = null
 
 
@@ -220,7 +220,7 @@ class Options:
 class Response:
 	## [code]true[/code] when a response was received with a 2xx status code.
 	var ok := true
-	## Error details when [member ok] is [code]false[/code]; [code]null[/code] otherwise.
+	## Error details when [member C3Http.Response.ok] is [code]false[/code]; [code]null[/code] otherwise.
 	var error: RequestError = null
 	## HTTP status code, e.g. [code]200[/code] or [code]404[/code].
 	## [code]0[/code] when no HTTP response was received (transport failure).
@@ -228,13 +228,13 @@ class Response:
 	## Response headers as [code]"Name: Value"[/code] strings.
 	## Empty when no HTTP response was received.
 	var headers: PackedStringArray = PackedStringArray()
-	## Raw response body bytes. Empty when [member Options.download_file] is set
-	## or when no body was received. Use [member text] for a decoded string view.
+	## Raw response body bytes. Empty when [member C3Http.Options.download_file] is set
+	## or when no body was received. Use [member C3Http.Response.text] for a decoded string view.
 	var body: PackedByteArray = PackedByteArray()
 	## The server's last SSE [code]retry:[/code] value, in milliseconds — the
 	## backoff it suggests before reconnecting. [code]-1[/code] when the stream
 	## sent no [code]retry:[/code] line or the response was not an SSE stream. Pair
-	## it with the [code]last_event_id[/code] from [member Options.on_sse_event] to
+	## it with the [code]last_event_id[/code] from [member C3Http.Options.on_sse_event] to
 	## reconnect: wait this long, then re-request with a [code]Last-Event-ID[/code]
 	## header set to the last id seen.
 	var sse_retry_ms: int = -1
@@ -252,7 +252,7 @@ class Response:
 	var _text_cache: Variant = null
 
 	## The response body parsed as JSON. Parsed lazily on first access and cached,
-	## reusing the [member text] decode. On a parse failure this pushes an error
+	## reusing the [member C3Http.Response.text] decode. On a parse failure this pushes an error
 	## (once, at parse time) and returns [code]null[/code]. Note that a successful
 	## parse of a literal JSON [code]null[/code] body also returns [code]null[/code].
 	var json: Variant:
@@ -275,8 +275,8 @@ class Response:
 	var _json_cache: Variant = null
 
 
-## Structured error placed on [member Response.error] when
-## [member Response.ok] is [code]false[/code].
+## Structured error placed on [member C3Http.Response.error] when
+## [member C3Http.Response.ok] is [code]false[/code].
 class RequestError:
 	## Broad category of failure.
 	enum Kind {
@@ -290,10 +290,10 @@ class RequestError:
 		CANCELLED,
 		## No response was received before the timeout elapsed.
 		TIMEOUT,
-		## The response body exceeded [member Options.body_size_limit].
+		## The response body exceeded [member C3Http.Options.body_size_limit].
 		BODY_SIZE_LIMIT_EXCEEDED,
 	}
-	## Broad category of failure. One of the [enum Kind] values.
+	## Broad category of failure. One of the [enum C3Http.RequestError.Kind] values.
 	var kind: Kind = Kind.TRANSPORT
 	## Human-readable description. Never empty.
 	var message := ""
@@ -328,7 +328,7 @@ class RequestError:
 		e.message = p_message
 		return e
 
-	## Builds an error for a response body that exceeded [member Options.body_size_limit].
+	## Builds an error for a response body that exceeded [member C3Http.Options.body_size_limit].
 	static func body_size_limit_exceeded(p_message: String) -> RequestError:
 		var e := RequestError.new()
 		e.kind = Kind.BODY_SIZE_LIMIT_EXCEEDED
@@ -344,7 +344,7 @@ class RequestError:
 		return " ".join(parts)
 
 
-## Token passed to [member Options.cancellation_token] to cancel an in-flight
+## Token passed to [member C3Http.Options.cancellation_token] to cancel an in-flight
 ## request from another coroutine or signal handler.
 class CancellationToken:
 	var _cancelled := false
@@ -354,7 +354,7 @@ class CancellationToken:
 	func cancel() -> void:
 		_cancelled = true
 
-	## Returns [code]true[/code] if [method cancel] has been called.
+	## Returns [code]true[/code] if [method C3Http.CancellationToken.cancel] has been called.
 	func is_cancelled() -> bool:
 		return _cancelled
 
@@ -362,10 +362,10 @@ class CancellationToken:
 ## Holds a pool of idle HTTP connections for reuse across calls, reducing the
 ## TCP and TLS handshake cost for repeated requests to the same host.
 ##
-## Create one [Session] per logical group of requests and set it on
-## [member Options.session]. A [Session] is a [RefCounted] and is freed
-## automatically when no [Options] objects reference it. [br][br]
-## One-off callers that leave [member Options.session] as [code]null[/code]
+## Create one [C3Http.Session] per logical group of requests and set it on
+## [member C3Http.Options.session]. A [C3Http.Session] is a [RefCounted] and is freed
+## automatically when no [C3Http.Options] objects reference it. [br][br]
+## One-off callers that leave [member C3Http.Options.session] as [code]null[/code]
 ## pay zero cost — a fresh connection is opened each time, as in previous versions.
 class Session:
 	## Maximum number of idle connections kept per unique
@@ -386,7 +386,7 @@ class Session:
 		var checked_in_at_msec: int
 
 	## Closes all pooled connections and empties the pool. Optional — connections
-	## are also freed when the [Session] goes out of scope.
+	## are also freed when the [C3Http.Session] goes out of scope.
 	func close() -> void:
 		_mutex.lock()
 		for key: String in _pool:
@@ -395,7 +395,7 @@ class Session:
 		_pool.clear()
 		_mutex.unlock()
 
-	## Evicts all idle connections whose age exceeds [member idle_timeout].
+	## Evicts all idle connections whose age exceeds [member C3Http.Session.idle_timeout].
 	## Useful after a network change to force fresh connections on the next call.
 	func prune() -> void:
 		if idle_timeout <= 0.0:
@@ -455,7 +455,7 @@ class Session:
 		return result
 
 	## Returns [param client] to the pool under [param key].
-	## If the pool is at [member max_connections_per_host] capacity,
+	## If the pool is at [member C3Http.Session.max_connections_per_host] capacity,
 	## the oldest idle entry is closed and evicted.
 	func checkin(key: String, client: HTTPClient) -> void:
 		_mutex.lock()
@@ -477,9 +477,9 @@ class Session:
 
 
 ## Test helper that intercepts [method C3Http.request] calls.
-## Install with [method install], configure canned responses with [method stub],
-## and inspect recorded calls via [member calls]. Always pair [method install]
-## with [method uninstall] in [code]after_each()[/code]. [br][br]
+## Install with [method C3Http.Mock.install], configure canned responses with [method C3Http.Mock.stub],
+## and inspect recorded calls via [member C3Http.Mock.calls]. Always pair [method C3Http.Mock.install]
+## with [method C3Http.Mock.uninstall] in [code]after_each()[/code]. [br][br]
 ## [codeblock]
 ## var mock: C3Http.Mock
 ##
@@ -501,10 +501,10 @@ class Mock extends _Impl:
 	## keys [code]url[/code] ([String]), [code]method[/code] ([int],
 	## [code]HTTPClient.METHOD_*[/code]), [code]headers[/code]
 	## ([PackedStringArray]), [code]body[/code] ([Variant]),
-	## and [code]options[/code] ([Options]).
+	## and [code]options[/code] ([C3Http.Options]).
 	var calls: Array[Dictionary] = []
 
-	## Total number of calls received since construction or the last [method reset].
+	## Total number of calls received since construction or the last [method C3Http.Mock.reset].
 	var call_count: int:
 		get:
 			return calls.size()
@@ -528,7 +528,7 @@ class Mock extends _Impl:
 	## Returns a stub builder for [param url]. Omit [param url] to create
 	## the catch-all default stub, matched when no URL-specific stub exists.
 	## [br][br]Stubs are evaluated in registration order; the first exact URL
-	## match wins, then the first default stub, then an empty [Response].
+	## match wins, then the first default stub, then an empty [C3Http.Response].
 	func stub(url: String = "") -> _Stub:
 		var s := _Stub.new(url)
 		_stubs.append(s)
@@ -569,8 +569,8 @@ class Mock extends _Impl:
 		return fallback if fallback != null else _Stub.new("")
 
 
-## Canned-response builder returned by [method Mock.stub]. Configure with
-## [method ok], [method fail], or [method returns], then discard — the [Mock]
+## Canned-response builder returned by [method C3Http.Mock.stub]. Configure with
+## [method ok], [method fail], or [method returns], then discard — the [C3Http.Mock]
 ## retains the stub internally.
 class _Stub:
 	var _url: String
@@ -580,7 +580,7 @@ class _Stub:
 		_url = url
 
 	## Configures a successful response. [param json] is JSON-encoded into
-	## [member Response.body].
+	## [member C3Http.Response.body].
 	func ok(json: Dictionary = {}, status: int = 200) -> void:
 		var res := Response.new()
 		res.ok = true
@@ -589,8 +589,8 @@ class _Stub:
 		_preset = res
 
 	## Configures a failure response. Build [param error] with the
-	## [RequestError] factory methods ([method RequestError.transport],
-	## [method RequestError.timed_out], etc.) or construct one manually.
+	## [C3Http.RequestError] factory methods ([method C3Http.RequestError.transport],
+	## [method C3Http.RequestError.timed_out], etc.) or construct one manually.
 	func fail(error: RequestError) -> void:
 		var res := Response.new()
 		res.ok = false
@@ -598,7 +598,7 @@ class _Stub:
 		res.status = error.status
 		_preset = res
 
-	## Sets a [Response] directly, bypassing [method ok] and [method fail].
+	## Sets a [C3Http.Response] directly, bypassing [method ok] and [method fail].
 	func returns(response: Response) -> void:
 		_preset = response
 
